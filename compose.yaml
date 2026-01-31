@@ -1,0 +1,31 @@
+services:
+  divvy-db:
+    image: postgres:16
+    ports:
+      - "5601:5432"
+    environment:
+      POSTGRES_DB: divvy-db
+      POSTGRES_USER: divvy
+      POSTGRES_PASSWORD: divvy
+    volumes:
+      - divvy_data:/var/lib/postgresql/data
+    networks:
+      divvy-network:
+
+
+  divvy-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      - divvy-db
+    ports:
+      - "8000:8000"
+    networks:
+      divvy-network:
+
+volumes:
+  divvy_data:
+
+networks:
+  divvy-network:
