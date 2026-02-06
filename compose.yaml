@@ -21,6 +21,8 @@ services:
       - divvy-db
     ports:
       - "8000:8000"
+    volumes:
+      - .:/app
     networks:
       divvy-network:
 
