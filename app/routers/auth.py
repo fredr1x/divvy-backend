@@ -29,6 +29,7 @@ GOOGLE_TOKENINFO_URL = "https://oauth2.googleapis.com/tokeninfo"
 
 @router.post("/register", response_model=TokenPair)
 def register(payload: UserCreate, db: Session = Depends(get_db)) -> TokenPair:
+
     if get_user_by_email(db, payload.email.__str__()):
         raise HTTPException(status_code=400, detail="Email already registered")
 
