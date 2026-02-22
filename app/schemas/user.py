@@ -15,7 +15,8 @@ class UserRead(BaseModel):
 
     id: int
     email: EmailStr
-    full_name: str | None = None
+    first_name: str | None = None
+    last_name: str | None = None
     is_active: bool
     auth_provider: str
     created_at: datetime
