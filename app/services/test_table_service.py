@@ -1,3 +1,4 @@
+from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -19,3 +20,11 @@ def get_all_from_test_table(db: Session) -> list[TestTable]:
 def get_test_table_by_id(db: Session, id: int) -> TestTable | None:
     statement = select(TestTable).where(TestTable.id == id)
     return db.scalar(statement)
+
+def delete_test_by_id(db: Session, id: int) -> None:
+    test = db.get(TestTable, id)
+    if not test:
+        raise HTTPException(status_code=404, detail="Test not found")
+
+    db.delete(test)
+    db.commit()

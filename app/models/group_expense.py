@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import TYPE_CHECKING
-
-from sqlalchemy import DateTime, ForeignKey, String
+from decimal import Decimal
+from sqlalchemy import DateTime, ForeignKey, String, Numeric
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -29,6 +29,10 @@ class GroupExpense(Base):
         String(256), nullable=True
     )
 
+    total_amount: Mapped[Decimal] = mapped_column(
+        Numeric(12, 2), nullable=False
+    )
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.now(), nullable=False
     )
@@ -37,13 +41,21 @@ class GroupExpense(Base):
         ForeignKey("users.id"), nullable=False
     )
 
+    last_modified_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=True
+    )
+
     payer: Mapped["User"] = relationship(
         back_populates="expenses_paid", foreign_keys=[payer_id]
     )
     created_by_user: Mapped["User"] = relationship(
         back_populates="expenses_created", foreign_keys=[created_by]
     )
-    group: Mapped["Group"] = relationship(back_populates="expenses")
+
+    group: Mapped["Group"] = relationship(
+        back_populates="expenses"
+    )
+
     splits: Mapped[list["ExpenseSplit"]] = relationship(
         back_populates="expense", cascade="all, delete-orphan"
     )

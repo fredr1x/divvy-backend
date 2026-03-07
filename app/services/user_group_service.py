@@ -9,13 +9,27 @@ from app.schemas.user import UserRead
 from app.schemas.user_group import UserGroupRead
 
 
+def get_group_by_id(
+        id: int,
+        db: Session
+) -> Group:
+    statement = select(Group).where(Group.id == id)
+    group = db.scalar(statement)
+
+    if not group:
+        raise HTTPException(status_code=404, detail=f"Group with id {id} not found")
+
+    return group
+
+
+# TODO add get_group_members_by_expense for update
 def get_group_members(
         id: int,
         db: Session
 ) -> list[UserRead]:
     statement = (select(User)
                  .join(UserGroup, UserGroup.user_id == User.id)
-                 .where(UserGroup.group_id == id))
+                 .where(UserGroup.group_id == id, UserGroup.is_active == True))
 
     return list(db.scalars(statement))
 
@@ -28,6 +42,11 @@ def add_to_group_by_email(
 
     email = payload.email
     group_id = payload.group_id
+    select_group = select(Group).where(Group.id == group_id)
+    group = db.scalar(select_group)
+
+    if not group:
+        raise HTTPException(status_code=404, detail=f"Group with id {group_id} not found")
 
     select_user_query = select(User).where(User.email == email)
     user_to_add = db.scalar(select_user_query)
@@ -51,12 +70,8 @@ def add_to_group_by_email(
     if not user_group:
         raise HTTPException(status_code=404, detail=f"User group information for user {current_user} and for group {group_id} not found")
 
-    group_role = user_group.group_role
-
-    if group_role != GroupRole.CREATOR and group_role != GroupRole.MODERATOR:
-        raise HTTPException(status_code=403, detail="Not enough permissions to add user to group")
-
-    user_group_to_save = UserGroup(group_id=group_id, user_id=user_to_add.id, group_role=GroupRole.MEMBER, )
+    user_group_to_save = UserGroup(group_id=group_id, user_id=user_to_add.id, group_role=GroupRole.MEMBER, is_active=False)
+    # todo add email sender
     db.add(user_group_to_save)
     db.commit()
     db.refresh(user_group_to_save)
@@ -70,7 +85,6 @@ def join_by_invitation_link(
 ) -> UserGroupRead:
 
     link = extract_link(link)
-    print(link)
 
     statement = select(Group).where(Group.invitation_link.endswith(f"/invite/{link}"))
     group = db.scalar(statement)
@@ -85,19 +99,44 @@ def join_by_invitation_link(
     )
     existing_member = db.scalar(existing_member_statement)
 
+    if not existing_member:
+        raise HTTPException(status_code=404, detail=f"User with invitation link {link} not found")
+
     if existing_member:
-        raise HTTPException(status_code=409, detail="User already member of this group")
+        if existing_member.is_active:
+            return existing_member
+        existing_member.is_active = True
+        db.commit()
+        db.refresh(existing_member)
+        return existing_member
 
     user_group_to_save = UserGroup(
         group_id=group.id,
         user_id=current_user.id,
         group_role=GroupRole.MEMBER,
+        is_active=True
     )
     db.add(user_group_to_save)
     db.commit()
     db.refresh(user_group_to_save)
     return user_group_to_save
 
+
+def is_member_of_group(
+        db: Session,
+        group_id: int,
+        user_id: int
+) -> bool:
+    find_by_user_id_and_group_id = (select(UserGroup)
+                                    .where(UserGroup.group_id == group_id,
+                                                       UserGroup.user_id == user_id))
+
+    user_group = db.scalar(find_by_user_id_and_group_id)
+
+    if not user_group:
+        return False
+
+    return True
 
 def extract_link(link: str) -> str:
     token = link.strip()

@@ -20,7 +20,7 @@ services:
     depends_on:
       - divvy-db
     ports:
-      - "8000:8000"
+      - "8001:8001"
     volumes:
       - .:/app
     networks:

@@ -1,7 +1,7 @@
 import enum
 
 
-class ShareType(enum.Enum):
+class ShareType(str, enum.Enum):
     EQUAL = "EQUAL"
     EXACT = "EXACT"
     PERCENTAGE = "PERCENTAGE"
