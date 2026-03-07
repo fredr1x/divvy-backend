@@ -92,7 +92,7 @@ def update_group(
     return group
 
 def generate_invitation_link() -> str:
-    return str("http://localhost:8000/invite/" + uuid.uuid4().__str__())
+    return str("http://localhost:8001/invite/" + uuid.uuid4().__str__())
 
 
 def add_creator_to_user_group(db: Session, group_id: int, creator_id: int) -> None:

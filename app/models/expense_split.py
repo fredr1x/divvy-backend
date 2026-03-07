@@ -5,7 +5,7 @@ from sqlalchemy import DateTime, ForeignKey, Enum, Numeric
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
-from app.models.enums import ShareType
+from app.models.enums import ShareType, SplitStatus
 
 if TYPE_CHECKING:
     from app.models.group_expense import GroupExpense
@@ -34,7 +34,21 @@ class ExpenseSplit(Base):
     )
 
     created_at: Mapped[datetime] = mapped_column(
-        DateTime, nullable=False, default=datetime.now()
+        DateTime, nullable=False, default=datetime.now
+    )
+
+    split_status: Mapped[SplitStatus] = mapped_column(
+        Enum(SplitStatus, name='split_status'),
+        nullable=False,
+        default=SplitStatus.PENDING,
+    )
+
+    paid_at: Mapped[datetime | None] = mapped_column(
+        DateTime, nullable=True
+    )
+
+    last_modified_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=True
     )
 
     user: Mapped["User"] = relationship(back_populates="expense_splits")

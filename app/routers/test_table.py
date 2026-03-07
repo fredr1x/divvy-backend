@@ -7,6 +7,7 @@ from app.schemas.test_table import TestTableCreate, TestTableRead
 from app.services.test_table_service import create_test_table
 from app.services.test_table_service import get_all_from_test_table
 from app.services.test_table_service import get_test_table_by_id
+from app.services.test_table_service import delete_test_by_id
 
 router = APIRouter(prefix="/test-tables", tags=["test-tables"])
 
@@ -33,3 +34,9 @@ def read_test_table_endpoint(
     if not record:
         raise HTTPException(status_code=404, detail="Not found")
     return record
+
+@router.delete("/{id}", status_code=204)
+def delete_test_table_endpoint(
+        id: int,
+        db: Session = Depends(get_db)):
+    delete_test_by_id(db, id)

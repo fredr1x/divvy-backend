@@ -27,6 +27,10 @@ class UserGroup(Base):
         ForeignKey("users.id"), nullable=False
     )
 
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True,
+    )
+
     group_role: Mapped[GroupRole] = mapped_column(
         Enum(GroupRole, name="group_role", create_constraint=True, validate_strings=True)
     )

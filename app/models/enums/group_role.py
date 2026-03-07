@@ -1,7 +1,7 @@
 import enum
 
 
-class GroupRole(enum.Enum):
+class GroupRole(str, enum.Enum):
     CREATOR = "CREATOR"
     MODERATOR = "MODERATOR"
     MEMBER = "MEMBER"
