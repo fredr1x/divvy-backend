@@ -11,7 +11,7 @@ from app.schemas.user_group import UserGroupRead, UserGroupAddMemberByEmail
 from app.schemas.user import UserRead
 
 from app.services.user_group_service import (get_group_members,
-                                             add_to_group_by_email as add_to_group_by_email_service,
+                                             invite_to_group_by_email as add_to_group_by_email_service,
                                              join_by_invitation_link as join_by_invitation_link_service)
 
 router = APIRouter(prefix="/user-groups", tags=["user group"])
@@ -23,8 +23,8 @@ def get_group_members_by_group_id(
 )-> list[UserRead]:
     return get_group_members(id, db)
 
-@router.post("/add-by-email", response_model=UserGroupRead)
-def add_to_group_by_email(
+@router.post("/invite-by-email", response_model=UserGroupRead)
+def invite_to_group_by_email(
         payload: UserGroupAddMemberByEmail,
         db: Session = Depends(get_db),
         current_user: User = Depends(get_current_user)

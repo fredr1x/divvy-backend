@@ -6,6 +6,10 @@ from app.routers.group import router as group_router
 from app.routers.user_group import router as user_group_router
 from app.routers.group_expense import router as group_expense_router
 from app.routers.expense_split import router as expense_split_router
+
+from dotenv import load_dotenv, find_dotenv
+
+load_dotenv(find_dotenv())
 app = FastAPI(title="Divvy API")
 
 app.include_router(auth_router)
