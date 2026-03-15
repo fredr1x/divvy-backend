@@ -2,6 +2,8 @@ from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+
+from app.services.email_service import send_invite_email
 from app.models import Group, User, UserGroup
 from app.models.enums import GroupRole
 from app.schemas import UserGroupAddMemberByEmail
@@ -34,7 +36,7 @@ def get_group_members(
     return list(db.scalars(statement))
 
 
-def add_to_group_by_email(
+def invite_to_group_by_email(
     payload: UserGroupAddMemberByEmail,
     db: Session,
     current_user: User
@@ -71,7 +73,9 @@ def add_to_group_by_email(
         raise HTTPException(status_code=404, detail=f"User group information for user {current_user} and for group {group_id} not found")
 
     user_group_to_save = UserGroup(group_id=group_id, user_id=user_to_add.id, group_role=GroupRole.MEMBER, is_active=False)
-    # todo add email sender
+
+    send_invite_email(email, group.name, group.invitation_link)
+
     db.add(user_group_to_save)
     db.commit()
     db.refresh(user_group_to_save)
