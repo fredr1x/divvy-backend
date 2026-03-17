@@ -1,10 +1,12 @@
 from datetime import datetime
-from typing import TYPE_CHECKING
 from decimal import Decimal
-from sqlalchemy import DateTime, ForeignKey, String, Numeric
+from typing import TYPE_CHECKING
+
+from sqlalchemy import DateTime, ForeignKey, String, Numeric, Enum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+from app.models.enums import ShareType, Currency
 
 if TYPE_CHECKING:
     from app.models.expense_split import ExpenseSplit
@@ -29,8 +31,19 @@ class GroupExpense(Base):
         String(256), nullable=True
     )
 
+    currency: Mapped[Currency] = mapped_column(
+        Enum(Currency, name="currency", create_constraint=True, validate_strings=True),
+        nullable=False, default=Currency.USD
+    )
+
     total_amount: Mapped[Decimal] = mapped_column(
         Numeric(12, 2), nullable=False
+    )
+
+    share_type: Mapped[ShareType] = mapped_column(
+        Enum(ShareType),
+        nullable=False,
+        default=ShareType.EQUAL
     )
 
     created_at: Mapped[datetime] = mapped_column(

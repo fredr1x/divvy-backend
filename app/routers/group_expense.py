@@ -17,7 +17,7 @@ def get_group_expenses(
     group_id: int,
     db: Session = Depends(get_db)
 ) -> list[GroupExpenseRead]:
-    return get_group_expense_service(group_id, db)
+    return get_group_expense_service(db, group_id)
 
 
 @router.post("", status_code=201)

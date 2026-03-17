@@ -66,5 +66,7 @@ class User(Base):
     )
 
     expense_splits: Mapped[list["ExpenseSplit"]] = relationship(
-        back_populates="user", cascade="all, delete-orphan"
+        back_populates="user",
+        cascade="all, delete-orphan",
+        foreign_keys="ExpenseSplit.user_id",
     )

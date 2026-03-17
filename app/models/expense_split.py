@@ -1,11 +1,12 @@
 from datetime import datetime
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, ForeignKey, Enum, Numeric
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
-from app.models.enums import ShareType, SplitStatus
+from app.models.enums import SplitStatus, SplitType
 
 if TYPE_CHECKING:
     from app.models.group_expense import GroupExpense
@@ -21,15 +22,11 @@ class ExpenseSplit(Base):
         ForeignKey("users.id"), nullable=False
     )
 
-    share_type: Mapped[ShareType] = mapped_column(
-        Enum(ShareType), nullable=False, default=ShareType.EQUAL, name="share_type"
-    )
-
     group_expense_id: Mapped[int] = mapped_column(
         ForeignKey("group_expenses.id"), nullable=False
     )
 
-    owed_amount: Mapped[Numeric] = mapped_column(
+    owed_amount: Mapped[Decimal] = mapped_column(
         Numeric(10, 2, asdecimal=True), nullable=False
     )
 
@@ -43,6 +40,16 @@ class ExpenseSplit(Base):
         default=SplitStatus.PENDING,
     )
 
+    split_type: Mapped[SplitType] = mapped_column(
+        Enum(SplitType, name='split_type'),
+        nullable=False,
+        default=SplitType.ORIGINAL,
+    )
+
+    refund_to_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id"), nullable=True
+    )
+
     paid_at: Mapped[datetime | None] = mapped_column(
         DateTime, nullable=True
     )
@@ -51,5 +58,13 @@ class ExpenseSplit(Base):
         DateTime, nullable=True
     )
 
-    user: Mapped["User"] = relationship(back_populates="expense_splits")
+    user: Mapped["User"] = relationship(
+        back_populates="expense_splits",
+        foreign_keys=[user_id],
+    )
+
+    refund_to_user: Mapped["User"] = relationship(
+        foreign_keys=[refund_to_user_id],
+    )
+
     expense: Mapped["GroupExpense"] = relationship(back_populates="splits")

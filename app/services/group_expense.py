@@ -6,11 +6,12 @@ from sqlalchemy.orm import Session, selectinload
 from app.models import GroupExpense
 from app.schemas.group_expense import GroupExpenseCreate, GroupExpenseRead, GroupExpenseUpdate
 from app.services.expense_split_service import create_expense_split, update_expense_split
-from app.services.user_group_service import is_member_of_group
+from app.services.user_group_service import is_member_of_group, get_group_by_id
+from app.services.user_service import get_user_by_id
 
 def get_group_expense(
-        group_id: int,
-        db: Session
+        db: Session,
+        group_id: int
 ) -> list[GroupExpenseRead]:
     stmt = (
         select(GroupExpense)
@@ -26,12 +27,18 @@ def create_group_expense(
         db: Session,
         payload: GroupExpenseCreate
 ) -> GroupExpenseRead:
+
+    group = get_group_by_id(db, payload.group_id)
+    payer = get_user_by_id(db, payload.payer_id)
+
     group_expense = GroupExpense(
-        payer_id=payload.payer_id,
-        group_id=payload.group_id,
+        payer_id=payer.id,
+        group_id=group.id,
         created_by=payload.created_by,
         name=payload.name,
-        total_amount=payload.total_amount
+        currency=payload.currency or group.currency,
+        total_amount=payload.total_amount,
+        share_type=payload.share_type
     )
 
     db.add(group_expense)

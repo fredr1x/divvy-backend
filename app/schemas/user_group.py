@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from app.models.enums import GroupRole
 
@@ -11,6 +11,8 @@ class UserGroupRead(BaseModel):
     user_id: int
     group_role: GroupRole
     joined_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class UserGroupAddMemberByEmail(BaseModel):

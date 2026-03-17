@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from app.models import ExpenseSplit, GroupExpense, UserGroup
-from app.models.enums import ShareType, SplitStatus
+from app.models.enums import ShareType, SplitStatus, SplitType
 from app.schemas import UserRead
 from app.schemas.expense_split import AllExpensesByGroupAndUser, OwedAmountDetail, ReceivableAmountDetail
 from app.schemas.group_expense import GroupExpenseCreate, GroupExpenseUpdate
@@ -75,7 +75,7 @@ def create_expense_split(
     payload: GroupExpenseCreate,
     group_expense_id: int
 ) -> None:
-    group_members = get_group_members(payload.group_id, db)
+    group_members = get_group_members(db, payload.group_id)
     validate_create_expense_request(group_members, payload)
 
     share_type = payload.share_type
@@ -96,7 +96,7 @@ def update_expense_split(
         group_expense: GroupExpense,
         payload: GroupExpenseUpdate
 )-> None:
-    group_members = get_group_members(group_expense.group_id, db)
+    group_members = get_group_members(db, group_expense.group_id)
     total_amount = normalize_amount(payload.total_amount)
 
     if total_amount <= 0:
@@ -105,14 +105,20 @@ def update_expense_split(
     payer_id = group_expense.payer_id
     share_type = payload.share_type
 
+    expense_splits = list(db.scalars(
+        select(ExpenseSplit).where(ExpenseSplit.group_expense_id == group_expense.id)
+    ).all())
+
+    # todo write if case to check if there is changes if no just return (go out of function)
+
     if share_type == ShareType.EQUAL:
-        calculate_and_update_equal_share_type(db, group_expense.id, payer_id, total_amount, group_members)
+        calculate_and_update_equal_share_type(db, group_expense.id, payer_id, total_amount, group_members, payload.expense_members, expense_splits)
 
     elif share_type == ShareType.EXACT:
-        calculate_and_update_exact_share_type(db, group_expense.id, payer_id, total_amount, payload.exact_share_amount, group_members)
+        calculate_and_update_exact_share_type(db, group_expense.id,total_amount, payload.exact_share_amount, group_members, payload.expense_members, expense_splits)
 
     elif share_type == ShareType.PERCENTAGE:
-        calculate_and_update_percentage_share_type(db, group_expense.id, payer_id, total_amount, payload.percentage_share_amount, group_members)
+        calculate_and_update_percentage_share_type(db,payer_id, total_amount, payload.percentage_share_amount, group_members, payload.expense_members, expense_splits)
 
     else:
         raise HTTPException(status_code=400, detail="Unsupported share type")
@@ -131,33 +137,28 @@ def calculate_and_save_equal_share_type(db: Session,
                                         group_members: list[UserRead],
                                         payload: GroupExpenseCreate):
 
+    expense_members = payload.expense_members
+    validate_group_members(group_members, expense_members, None)
     total_amount = normalize_amount(payload.total_amount)
 
     if total_amount <= 0:
         raise HTTPException(status_code=400, detail="Total amount must be greater than zero")
 
-    amount_for_each_member = normalize_amount(total_amount / len(group_members))
-    remainder = total_amount - (amount_for_each_member * len(group_members))
+    amount_for_each_member = normalize_amount(total_amount / len(expense_members))
+    remainder = total_amount - (amount_for_each_member * len(expense_members))
     payer_share = amount_for_each_member + remainder
-    for member in group_members:
-        if member.id == payload.payer_id:
-            build_expense(db,
-                         member.id,
-                         group_expense_id,
-                         total_amount - payer_share,
-                         ShareType.EQUAL,
-                          True
-            )
 
-        else:
-            build_expense(
-                db,
-                member.id,
-                group_expense_id,
-                -abs(amount_for_each_member),
-                ShareType.EQUAL,
-                False
-            )
+    active_members = [m for m in group_members if m.id in expense_members]
+    for member in active_members:
+        is_payer = member.id == payload.payer_id
+        amount = payer_share if is_payer else amount_for_each_member
+        build_expense(db,
+                     member.id,
+                     group_expense_id,
+                     amount,
+                     SplitType.ORIGINAL,
+                      is_payer
+        )
 
 
 def calculate_and_save_exact_share_type(db: Session,
@@ -169,7 +170,7 @@ def calculate_and_save_exact_share_type(db: Session,
         raise HTTPException(status_code=400, detail="Total amount must be greater than zero")
 
     shares = validate_shares(payload.exact_share_amount, "exact")
-    validate_group_members(group_members, shares, "exact")
+    validate_group_members(group_members, payload.expense_members, shares)
 
     total_shares = sum(shares.values(), Decimal("0.00"))
     if total_shares != total_amount:
@@ -177,24 +178,14 @@ def calculate_and_save_exact_share_type(db: Session,
 
     for member in group_members:
         share = shares[member.id]
-        if member.id == payload.payer_id:
-            owed_amount = total_amount - share
-            build_expense(db,
-                          member.id,
-                          group_expense_id,
-                          owed_amount,
-                          ShareType.EXACT,
-                          True
-            )
-
-        else:
-            owed_amount = -share
+        is_payer = member.id == payload.payer_id
+        amount = total_amount - share if is_payer else -share
         build_expense(db,
                       member.id,
                       group_expense_id,
-                      owed_amount,
-                      ShareType.EXACT,
-                      False
+                      amount,
+                      SplitType.ORIGINAL,
+                      is_payer
         )
 
 
@@ -208,55 +199,48 @@ def calculate_and_save_percentage_share_type(db: Session,
         raise HTTPException(status_code=400, detail="Total amount must be greater than zero")
 
     percentages = validate_percentages(payload.percentage_share_amount)
-    validate_group_members(group_members, percentages, "percentage")
+    validate_group_members(group_members, payload.expense_members, percentages)
 
-    total_percentage = sum(percentages.values(), Decimal("0.00"))
-    if total_percentage !=  Decimal("100.00"):
-        raise HTTPException(status_code=400, detail="Percentage shares must sum to 100")
+    remainder, shares = calculate_remainder_and_shares_for_percentage_type(group_members, percentages, total_amount)
+    shares[payload.payer_id] = normalize_amount(shares[payload.payer_id] + remainder)
 
+    for member in group_members:
+        share = shares[member.id]
+        is_payer = member.id == payload.payer_id
+        amount = total_amount - share if is_payer else -share
+        build_expense(db,
+                      member.id,
+                      group_expense_id,
+                      amount,
+                      SplitType.ORIGINAL,
+                      is_payer
+        )
+
+
+def calculate_remainder_and_shares_for_percentage_type(group_members: list[UserRead], percentages: dict[int, Decimal],
+                                                       total_amount: Decimal) -> tuple[Decimal, dict[int, Decimal]]:
     shares: dict[int, Decimal] = {}
     for member in group_members:
         percent = percentages[member.id]
         shares[member.id] = normalize_amount(total_amount * percent / Decimal("100.00"))
 
     remainder = total_amount - sum(shares.values(), Decimal("0.00"))
-    shares[payload.payer_id] = normalize_amount(shares[payload.payer_id] + remainder)
-
-    for member in group_members:
-        share = shares[member.id]
-        if member.id == payload.payer_id:
-            owed_amount = total_amount - share
-            build_expense(db,
-                          member.id,
-                          group_expense_id,
-                          owed_amount,
-                          ShareType.PERCENTAGE,
-                          True
-            )
-        else:
-            owed_amount = -share
-        build_expense(db,
-                      member.id,
-                      group_expense_id,
-                      owed_amount,
-                      ShareType.PERCENTAGE,
-                      False
-        )
+    return remainder, shares
 
 
 def build_expense(db: Session,
                   member_id: int,
                   group_expense_id: int,
                   amount_for_each_member: Decimal,
-                  share_type: ShareType,
+                  split_type: SplitType,
                   payer: bool,
 ) -> None:
 
     split = ExpenseSplit(user_id=member_id,
                          group_expense_id=group_expense_id,
                          owed_amount=amount_for_each_member,
-                         share_type=share_type,
-                         split_status=SplitStatus.PAYER if payer else SplitStatus.PENDING
+                         split_status=SplitStatus.PAYER if payer else SplitStatus.PENDING,
+                         split_type=split_type
     )
 
     db.add(split)
@@ -295,110 +279,159 @@ def validate_percentages(
     for value in percentages.values():
         if value > Decimal("100.00"):
             raise HTTPException(status_code=400, detail="Percentages must be between 0 and 100")
+
+    total_percentage = sum(percentages.values(), Decimal("0.00"))
+    if total_percentage !=  Decimal("100.00"):
+        raise HTTPException(status_code=400, detail="Percentage shares must sum to 100")
     return percentages
 
 
 def validate_group_members(
     group_members: list[UserRead],
-    shares: dict[int, Decimal],
-    share_type: str,
+    expense_members: list[int],
+    shares: dict[int, Decimal] | None = None,
 ) -> None:
     member_ids = {member.id for member in group_members}
-    share_ids = set(shares.keys())
+    expense_ids = set(expense_members)
 
+    unknown_members = expense_ids - member_ids
+    if unknown_members:
+        raise HTTPException(status_code=400, detail="Expense members includes unknown members")
+
+    if shares is None:
+        return
+
+    share_ids = set(shares.keys())
     unknown_members = share_ids - member_ids
     if unknown_members:
-        raise HTTPException(status_code=400, detail=f"{share_type.capitalize()} shares include unknown users")
-
-    # set subtract
-    missing_members = member_ids - share_ids
-    if missing_members:
-        raise HTTPException(status_code=400, detail=f"{share_type.capitalize()} shares must include all group members")
+        raise HTTPException(status_code=400, detail="Share includes unknown members")
 
 
-def calculate_and_update_equal_share_type(db: Session,
-                                          group_expense_id: int,
-                                          payer_id: int,
-                                          total_amount: Decimal,
-                                          group_members: list[UserRead],
+def calculate_and_update_equal_share_type(
+    db: Session,
+    group_expense_id: int,
+    payer_id: int,
+    total_amount: Decimal,
+    group_members: list[UserRead],
+    expense_members: list[int],
+    expense_splits: list[ExpenseSplit]
 ):
-    find_expense_splits = select(ExpenseSplit).where(ExpenseSplit.group_expense_id == group_expense_id)
+    validate_group_members(group_members, expense_members, None)
 
-    expense_splits = db.scalars(find_expense_splits).all()
+    existing_split_map = {split.user_id: split for split in expense_splits}
 
-    amount_for_each_member = normalize_amount(total_amount / len(group_members))
-    remainder = total_amount - (amount_for_each_member * len(group_members))
-    payer_share = amount_for_each_member + remainder
+    count = len(expense_members)
+    amount_for_each = normalize_amount(total_amount / count)
+    remainder = total_amount - (amount_for_each * count)
+    payer_share = amount_for_each + remainder
 
     now = datetime.now()
-    for split in expense_splits:
-        if split.user_id == payer_id:
-            split.owed_amount = payer_share
-        else:
-            split.owed_amount = -abs(payer_share)
+
+    removed_user_ids = set(existing_split_map.keys()) - set(expense_members)
+    for user_id in removed_user_ids:
+        split = existing_split_map[user_id]
+
+        if split.split_status == SplitStatus.PAID:
+            db.add(ExpenseSplit(
+                user_id=payer_id,
+                group_expense_id=group_expense_id,
+                owed_amount=-abs(split.owed_amount),
+                split_status=SplitStatus.PENDING,
+                split_type=SplitType.REFUND,
+                refund_to_user_id=user_id,
+                created_at=now,
+                last_modified_at=now,
+            ))
+
+        db.delete(split)
+
+    new_user_ids = set(expense_members) - set(existing_split_map.keys())
+    for member in group_members:
+        if member.id not in new_user_ids:
+            continue
+
+        is_payer = member.id == payer_id
+        build_expense(
+            db,
+            member.id,
+            group_expense_id,
+            payer_share if is_payer else amount_for_each,
+            SplitType.ORIGINAL,
+            is_payer
+        )
+
+    for user_id, split in existing_split_map.items():
+        if user_id in removed_user_ids:
+            continue
+
+        if split.split_status == SplitStatus.PAID:
+            old_amount = abs(split.owed_amount)
+            new_amount = payer_share if user_id == payer_id else amount_for_each
+            diff = old_amount - new_amount
+
+            if diff > 0:
+                db.add(ExpenseSplit(
+                    user_id=payer_id,
+                    group_expense_id=group_expense_id,
+                    owed_amount=-diff,
+                    split_status=SplitStatus.PENDING,
+                    split_type=SplitType.REFUND,
+                    refund_to_user_id=user_id,
+                    created_at=now,
+                    last_modified_at=now,
+                ))
+            continue
+
+        is_payer = user_id == payer_id
+        split.owed_amount = payer_share if is_payer else -amount_for_each
         split.last_modified_at = now
-        split.share_type = ShareType.EQUAL
 
     db.commit()
 
-
-def calculate_and_update_exact_share_type(db: Session,
-                                          group_expense_id: int,
-                                          payer_id: int,
-                                          total_amount: Decimal,
-                                          exact_share_amount: dict[int, Decimal],
-                                          group_members: list[UserRead]
+def calculate_and_update_exact_share_type(
+    db: Session,
+    payer_id: int,
+    total_amount: Decimal,
+    exact_share_amount: dict[int, Decimal],
+    group_members: list[UserRead],
+    expense_members: list[int],
+    expense_splits: list[ExpenseSplit]
 ):
     shares = validate_shares(exact_share_amount, "exact")
-    validate_group_members(group_members, shares, "exact")
+    validate_group_members(group_members, expense_members, shares)
 
     total_shares = sum(shares.values(), Decimal("0.00"))
     if total_shares != total_amount:
         raise HTTPException(status_code=400, detail="Exact shares must sum to total amount")
 
-    find_expense_splits = select(ExpenseSplit).where(ExpenseSplit.group_expense_id == group_expense_id)
-
-    expense_splits = db.scalars(find_expense_splits).all()
-    now = datetime.now()
-
-    for split in expense_splits:
-        share = shares[split.user_id]
-        if split.user_id == payer_id:
-            split.owed_amount = total_amount - share
-        else:
-            split.owed_amount = -abs(share)
-        split.last_modified_at = now
-        split.share_type = ShareType.EXACT
-
-    db.commit()
+    update_and_save(db, expense_splits, payer_id, shares, total_amount)
 
 
-def calculate_and_update_percentage_share_type(db: Session,
-                                               group_expense_id: int,
-                                               payer_id: int, total_amount: Decimal,
-                                               percentage_share_amount: dict[int, Decimal],
-                                               group_members: list[UserRead]
+def calculate_and_update_percentage_share_type(
+    db: Session,
+    payer_id: int, total_amount: Decimal,
+    percentage_share_amount: dict[int, Decimal],
+    group_members: list[UserRead],
+    expense_members: list[int],
+    expense_splits: list[ExpenseSplit]
 ):
     percentages = validate_percentages(percentage_share_amount)
-    validate_group_members(group_members, percentages, "percentage")
+    validate_group_members(group_members, expense_members, percentages)
 
-    total_percentage = sum(percentages.values(), Decimal("0.00"))
-    if total_percentage != Decimal("100.00"):
-        raise HTTPException(status_code=400, detail="Percentage shares must sum to 100")
-
-    shares: dict[int, Decimal] = {}
-    for member in group_members:
-        percent = percentages[member.id]
-        shares[member.id] = normalize_amount(total_amount * percent / Decimal("100.00"))
-
-    remainder = total_amount - sum(shares.values(), Decimal("0.00"))
+    remainder, shares = calculate_remainder_and_shares_for_percentage_type(group_members, percentages, total_amount)
     shares[payer_id] = normalize_amount(shares[payer_id] + remainder)
 
-    find_expense_splits = select(ExpenseSplit).where(ExpenseSplit.group_expense_id == group_expense_id)
+    update_and_save(db, expense_splits, payer_id, shares, total_amount)
 
-    expense_splits = db.scalars(find_expense_splits).all()
+
+def update_and_save(
+        db: Session,
+        expense_splits: list[ExpenseSplit],
+        payer_id: int,
+        shares: dict[int, Decimal],
+        total_amount: Decimal
+):
     now = datetime.now()
-
     for split in expense_splits:
         share = shares[split.user_id]
         if split.user_id == payer_id:
@@ -406,6 +439,5 @@ def calculate_and_update_percentage_share_type(db: Session,
         else:
             split.owed_amount = -abs(share)
         split.last_modified_at = now
-        split.share_type = ShareType.PERCENTAGE
 
     db.commit()

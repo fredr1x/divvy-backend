@@ -1,3 +1,4 @@
+from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -5,18 +6,25 @@ from app.core.security import hash_password
 from app.models.user import User
 
 
-def get_user_by_id(db: Session, user_id: int) -> User | None:
-    return db.get(User, user_id)
+def get_user_by_id(db: Session, user_id: int) -> User:
+    user = db.scalar(select(User).where(User.id == user_id))
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
 
 
 def get_user_by_email(db: Session, email: str) -> User | None:
-    stmt = select(User).where(User.email == email)
-    return db.scalar(stmt)
+    user = db.scalar(select(User).where(User.email == email))
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
 
 
 def get_user_by_google_sub(db: Session, google_sub: str) -> User | None:
-    stmt = select(User).where(User.google_sub == google_sub)
-    return db.scalar(stmt)
+    user = db.scalar(select(User).where(User.google_sub == google_sub))
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
 
 
 def create_user_local(

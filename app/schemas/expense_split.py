@@ -3,12 +3,12 @@ from decimal import Decimal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models.enums import ShareType, SplitStatus
+from app.models.enums import SplitStatus, SplitType
 
 class ExpenseSplitDetails(BaseModel):
     user_id: int
     owed_amount: Decimal
-    share_type: ShareType
+    split_type: SplitType
     status: SplitStatus = Field(validation_alias="split_status")
     created_at: datetime
 
