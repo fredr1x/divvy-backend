@@ -21,7 +21,7 @@ def get_group_members_by_group_id(
         id: int,
         db: Session = Depends(get_db)
 )-> list[UserRead]:
-    return get_group_members(id, db)
+    return get_group_members(db, id)
 
 @router.post("/invite-by-email", response_model=UserGroupRead)
 def invite_to_group_by_email(
@@ -29,7 +29,7 @@ def invite_to_group_by_email(
         db: Session = Depends(get_db),
         current_user: User = Depends(get_current_user)
 ) -> UserGroupRead:
-    return add_to_group_by_email_service(payload, db, current_user)
+    return add_to_group_by_email_service(db, payload, current_user)
 
 @router.post("/invite/{link}")
 def join_by_invitation_link(
@@ -37,4 +37,4 @@ def join_by_invitation_link(
         db: Session = Depends(get_db),
         current_user: User = Depends(get_current_user)
 ):
-    return join_by_invitation_link_service(link, db, current_user)
+    return join_by_invitation_link_service(db, link, current_user)

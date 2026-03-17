@@ -12,8 +12,8 @@ from app.schemas.user_group import UserGroupRead
 
 
 def get_group_by_id(
-        id: int,
-        db: Session
+        db: Session,
+        id: int
 ) -> Group:
     statement = select(Group).where(Group.id == id)
     group = db.scalar(statement)
@@ -26,8 +26,8 @@ def get_group_by_id(
 
 # TODO add get_group_members_by_expense for update
 def get_group_members(
-        id: int,
-        db: Session
+        db: Session,
+        id: int
 ) -> list[UserRead]:
     statement = (select(User)
                  .join(UserGroup, UserGroup.user_id == User.id)
@@ -37,8 +37,8 @@ def get_group_members(
 
 
 def invite_to_group_by_email(
-    payload: UserGroupAddMemberByEmail,
     db: Session,
+    payload: UserGroupAddMemberByEmail,
     current_user: User
 ) -> UserGroupRead:
 
@@ -79,12 +79,12 @@ def invite_to_group_by_email(
     db.add(user_group_to_save)
     db.commit()
     db.refresh(user_group_to_save)
-    return user_group_to_save
+    return UserGroupRead.model_validate(user_group_to_save)
 
 
 def join_by_invitation_link(
-    link: str,
     db: Session,
+    link: str,
     current_user: User
 ) -> UserGroupRead:
 
@@ -123,7 +123,7 @@ def join_by_invitation_link(
     db.add(user_group_to_save)
     db.commit()
     db.refresh(user_group_to_save)
-    return user_group_to_save
+    return UserGroupRead.model_validate(user_group_to_save)
 
 
 def is_member_of_group(

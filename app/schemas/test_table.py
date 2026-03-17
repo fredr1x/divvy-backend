@@ -6,6 +6,6 @@ class TestTableCreate(BaseModel):
 
 
 class TestTableRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
     id: int
     text: str
+    model_config = ConfigDict(from_attributes=True)

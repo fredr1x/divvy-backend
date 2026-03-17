@@ -11,8 +11,6 @@ class UserCreate(BaseModel):
 
 
 class UserRead(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
     id: int
     email: EmailStr
     first_name: str | None = None
@@ -20,3 +18,5 @@ class UserRead(BaseModel):
     is_active: bool
     auth_provider: str
     created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
