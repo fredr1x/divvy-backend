@@ -2,9 +2,11 @@ import asyncio
 import logging
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
-from services.const import AppState, lifespan
-from services.preprocess import preprocess_receipt
-from services.qwen_client import call_qwen
+from ocr.services.const import AppState, lifespan
+from ocr.services.preprocess import preprocess_receipt
+from ocr.services.qwen_client import call_qwen
+import json
+
 
 logger = logging.getLogger(__name__)
 
@@ -12,13 +14,13 @@ def get_models(request: Request) -> AppState:
     return request.app.state.models
 
 
-router = APIRouter(lifespan=lifespan)
+router = APIRouter(lifespan=lifespan, tags=["ocr"])
 
 
 @router.post("/scan-receipt")
 async def scan_receipt(
     files: list[UploadFile] = File(...), state: AppState = Depends(get_models)
-) -> dict:
+):
 
     if not files:
         logger.warning("No Files Provided")
@@ -26,24 +28,32 @@ async def scan_receipt(
 
     results = await asyncio.gather(
         *[_process_single(f, state) for f in files],
-        return_exceptions=True,
+        return_exceptions=True
     )
 
-    return {
-        "results": [
-            {"filename": files[i].filename, "result": r}
-            if not isinstance(r, Exception)
-            else {"filename": files[i].filename, "error": str(r)}
-            for i, r in enumerate(results)
-        ]
-    }
+    receipt = results[0]
+    if len(results) > 1:
+        for r in results[1:]:
+            receipt['items'].extend(r['items'])
+
+    return receipt
+
 
 
 async def _process_single(file: UploadFile, state: AppState) -> str:
     img_bytes = await file.read()
 
-    img_b64 = preprocess_receipt(state, img_bytes)
+    try:
+        img_b64 = await preprocess_receipt(state, img_bytes)
 
-    result = call_qwen(state, img_b64)
+        result = await call_qwen(state, img_b64)
+        
+        parsed = json.loads(result)
 
-    return result
+        return parsed
+    except Exception as e:
+        logger.error(e)
+        return {
+            "items":[]
+        }
+

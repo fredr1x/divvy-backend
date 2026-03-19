@@ -64,13 +64,15 @@ Language: The receipt text may be in Kazakh, Russian, English or a mix. Extract 
 Filtering: Ignore header information (store name, address, tax IDs) and footer information (totals, payment methods, QR codes). Focus only on the list of purchased goods.
 Accuracy: Ensure the price matches the line item total, not the unit price (unless they are the same).
 
+Return JSON only. No assumptions. No inferred prices.
+
 ```json
 {
   "items": [
     {
-      "item_name": "string",
+      "name": "string",
       "quantity": integer,
-      "price": number
+      "price": number | null
     }
   ]
 }

@@ -1,14 +1,15 @@
 import logging
-
-from const import SYSTEM_PROMPT, AppState, ReceiptItem
-
+from ocr.services.const import SYSTEM_PROMPT, AppState
+from time import time
 logger = logging.getLogger(__name__)
 
 
 async def call_qwen(state: AppState, img_b64: str):
 
-    response = await state.qwen.chat.completions.create(
-        model="qwen3-vl-flash",
+    logger.info("Send receipt to the QWEN")
+    start = time()
+    raw = await state.qwen.chat.completions.create(
+        model="qwen3.5-flash",
         messages=[
             {"role": "system", "content": SYSTEM_PROMPT},
             {
@@ -27,4 +28,10 @@ async def call_qwen(state: AppState, img_b64: str):
         temperature=0,
     )
 
-    return response
+    logger.info(f"Get response from QWEN in {time() - start} seconds")
+
+    if items := raw.choices[0].message.content:
+        logger.info(items)
+        return items
+    
+    raise Exception("Unable to analyze receipt", 500)

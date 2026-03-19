@@ -1,12 +1,10 @@
 import asyncio
 import base64
-import logging
 
 import cv2
 import numpy as np
-from const import AppState
+from ocr.services.const import AppState
 
-logger = logging.getLogger(__name__)
 
 
 async def preprocess_receipt(state: AppState, img_bytes) -> str:
