@@ -1,3 +1,5 @@
 /.env
 
-/divvy-env
+divvy-env/
+
+__pycache__/

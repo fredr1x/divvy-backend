@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pydantic import BaseModel, Field
 from fastapi import APIRouter
-from openai import AsyncOpenAI
+from anthropic import AsyncAnthropic
 from ultralytics import YOLO
 import logging
 
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class AppState:
     yolo: YOLO
-    qwen: AsyncOpenAI
+    vlm: AsyncAnthropic
 
 
 @asynccontextmanager
@@ -22,20 +22,19 @@ async def lifespan(router: APIRouter):
 
     yolo_model = await asyncio.to_thread(YOLO, r"ocr\services\detector.pt")
 
-    qwen_client = AsyncOpenAI(
-        base_url=os.getenv("QWEN_BASE_URL"),
-        api_key=os.getenv("QWEN_API_KEY"),
+    vlm_client = AsyncAnthropic(
+        api_key=os.getenv("CLAUDE_API_KEY"),
         timeout=30.0,
         max_retries=2,
     )
 
-    router.state.models = AppState(yolo=yolo_model, qwen=qwen_client)
+    router.state.models = AppState(yolo=yolo_model, vlm=vlm_client)
 
     logger.info("Loaded YOLO and QWEN Client")
 
     yield
 
-    await qwen_client.close()
+    await vlm_client.close()
 
 
 class ReceiptItem(BaseModel):
@@ -45,35 +44,68 @@ class ReceiptItem(BaseModel):
 
 
 SYSTEM_PROMPT = """
-#Context#
-You are a receipt parsing engine. Your only job is to extract structured data from receipt images and return it as valid JSON.
+<system>
+You are a receipt parsing engine. Extract structured data from receipt images and return valid JSON only. Do not include explanations, markdown, or any text outside the JSON object.
 
-#Objective#
-Accurately extract line-item information into a structured JSON format.
-Identify every purchased item on the receipt and extract the following fields:
-1.item_name: The full description of the product. This may include barcodes, brand names, weights (e.g., "1КГ", "500гр"), and product types. Do not truncate long names. Do not include price calculation.
-2.quantity: The amount purchased.
-For weighted items (e.g., meat, fruit), do not extract the specific weight (e.g., 1.140, 0.540).
-Items where no quantity is listed, default the quantity to 1.
-3.price: The total price charged for that specific line item (the final amount for that row). 
-If a unit price and quantity are shown (e.g., "1.140 X 2190.00 = 2496.60"), extract the final total (2496.60).
-Ignore currency symbols (like "Б" or "₸") in the numerical value, but note the currency if possible.
+<task>
+Parse every line-item from the receipt image and return a JSON array of purchased items.
+</task>
 
-#Constraints & Guidelines#
-Language: The receipt text may be in Kazakh, Russian, English or a mix. Extract the text exactly as it appears.
-Filtering: Ignore header information (store name, address, tax IDs) and footer information (totals, payment methods, QR codes). Focus only on the list of purchased goods.
-Accuracy: Ensure the price matches the line item total, not the unit price (unless they are the same).
-
-Return JSON only. No assumptions. No inferred prices.
-
-```json
+<output_schema>
+Return this exact structure:
 {
   "items": [
     {
-      "name": "string",
-      "quantity": integer,
-      "price": number | null
+      "item_name": "<full product description as printed>",
+      "quantity": <number>,
+      "price": <number>
     }
   ]
 }
+</output_schema>
+
+<field_rules>
+
+  <item_name>
+    - Copy the full description exactly as printed on the receipt
+    - Include brand names, weights (e.g. "1КГ", "500гр"), barcodes, and product types
+    - DO NOT truncate or summarize
+    - DO NOT include price calculations in this field
+  </item_name>
+
+  <quantity>
+    - Extract the quantity if explicitly shown
+    - For weighted items (meat, produce, bulk goods), use 1 — do not extract the weight (e.g. 1.140 kg) as quantity
+    - If no quantity is listed, default to 1
+  </quantity>
+
+  <price>
+    - Extract the final line-item total only
+    - If a calculation is shown (e.g. "1.140 × 2190.00 = 2496.60"), extract the result: 2496.60
+    - Strip currency symbols — return a plain number
+    - Never return a unit price when a line total is available
+  </price>
+
+</field_rules>
+
+<scope>
+  <include>Purchased goods list only</include>
+  <exclude>
+    - Store name, address, tax IDs, cashier info (header)
+    - Subtotals, totals, taxes, discounts, payment method, QR codes (footer)
+  </exclude>
+</scope>
+
+<language_note>
+Receipt text may be in Kazakh, Russian, English, or a mix. Extract item names exactly as printed — do not translate.
+</language_note>
+
+<output_rules>
+- Return only the JSON object
+- No markdown fences (no ```json)
+- No commentary before or after
+- If the image contains no parseable items, return: {"items": []}
+</output_rules>
+
+</system>
 """
