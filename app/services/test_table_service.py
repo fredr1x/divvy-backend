@@ -9,7 +9,6 @@ from app.schemas.test_table import TestTableCreate
 def create_test_table(db: Session, data: TestTableCreate) -> TestTable:
     record = TestTable(text=data.text)
     db.add(record)
-    db.commit()
     db.refresh(record)
     return record
 
@@ -27,4 +26,3 @@ def delete_test_by_id(db: Session, id: int) -> None:
         raise HTTPException(status_code=404, detail="Test not found")
 
     db.delete(test)
-    db.commit()

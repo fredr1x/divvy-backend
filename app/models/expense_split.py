@@ -34,7 +34,8 @@ class ExpenseSplit(Base):
         DateTime, nullable=False, default=datetime.now
     )
 
-    split_status: Mapped[SplitStatus] = mapped_column(
+    status: Mapped[SplitStatus] = mapped_column(
+        "split_status",
         Enum(SplitStatus, name='split_status'),
         nullable=False,
         default=SplitStatus.PENDING,

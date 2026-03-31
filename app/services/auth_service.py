@@ -18,7 +18,6 @@ def issue_token_pair(db: Session, user: User) -> tuple[str, str]:
         expires_at=datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
     )
     db.add(refresh)
-    db.commit()
     return access_token, refresh_plain
 
 
@@ -37,7 +36,6 @@ def rotate_refresh_token(db: Session, refresh_plain: str) -> tuple[str, str] | N
 
     refresh.revoked_at = datetime.utcnow()
     db.add(refresh)
-    db.commit()
 
     user = refresh.user
     return issue_token_pair(db, user)
@@ -49,5 +47,4 @@ def revoke_refresh_token(db: Session, refresh_plain: str) -> bool:
         return False
     refresh.revoked_at = datetime.utcnow()
     db.add(refresh)
-    db.commit()
     return True

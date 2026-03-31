@@ -77,7 +77,6 @@ def invite_to_group_by_email(
     send_invite_email(email, group.name, group.invitation_link)
 
     db.add(user_group_to_save)
-    db.commit()
     db.refresh(user_group_to_save)
     return UserGroupRead.model_validate(user_group_to_save)
 
@@ -110,7 +109,6 @@ def join_by_invitation_link(
         if existing_member.is_active:
             return existing_member
         existing_member.is_active = True
-        db.commit()
         db.refresh(existing_member)
         return existing_member
 
@@ -121,7 +119,6 @@ def join_by_invitation_link(
         is_active=True
     )
     db.add(user_group_to_save)
-    db.commit()
     db.refresh(user_group_to_save)
     return UserGroupRead.model_validate(user_group_to_save)
 

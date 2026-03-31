@@ -11,6 +11,7 @@ from app.models.enums import ShareType, Currency
 if TYPE_CHECKING:
     from app.models.expense_split import ExpenseSplit
     from app.models.group import Group
+    from app.models.item import Item
     from app.models.user import User
 
 
@@ -70,5 +71,9 @@ class GroupExpense(Base):
     )
 
     splits: Mapped[list["ExpenseSplit"]] = relationship(
+        back_populates="expense", cascade="all, delete-orphan"
+    )
+
+    items: Mapped[list["Item"]] = relationship(
         back_populates="expense", cascade="all, delete-orphan"
     )

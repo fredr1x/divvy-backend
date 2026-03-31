@@ -5,9 +5,9 @@ from app.dependencies import get_current_user
 from app.db.session import get_db
 from app.models import User
 from app.schemas.group_expense import GroupExpenseCreate, GroupExpenseRead, GroupExpenseUpdate
-from app.services.group_expense import (create_group_expense as create_group_expense_service,
-                                        get_group_expense as get_group_expense_service,
-                                        update_group_expense as update_group_expense_service)
+from app.services.group_expense_service import (create_group_expense as create_group_expense_service,
+                                                get_group_expense_by_group_id as get_group_expense_service,
+                                                update_group_expense as update_group_expense_service)
 
 router = APIRouter(prefix="/group-expenses", tags=["group expenses"])
 

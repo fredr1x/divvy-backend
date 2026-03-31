@@ -34,9 +34,8 @@ def create_group(
     db.add(group)
     db.flush()
     add_creator_to_user_group(db, group.id, creator_id)
-    db.commit()
     db.refresh(group)
-    return group
+    return GroupRead.model_validate(group)
 
 
 def get_group_by_id(
@@ -87,7 +86,6 @@ def update_group(
 
     group.name = group_update.name
     group.currency = group_update.currency
-    db.commit()
     db.refresh(group)
     return group
 

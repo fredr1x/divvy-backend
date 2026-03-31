@@ -146,7 +146,6 @@ def google_callback(
             existing.google_sub = google_sub
             existing.auth_provider = "google"
             db.add(existing)
-            db.commit()
             db.refresh(existing)
             user = existing
         else:

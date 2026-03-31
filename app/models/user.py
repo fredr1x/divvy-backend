@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     from app.models.expense_split import ExpenseSplit
     from app.models.group import Group
     from app.models.group_expense import GroupExpense
+    from app.models.item_split import ItemSplit
     from app.models.refresh_token import RefreshToken
     from app.models.user_group import UserGroup
 
@@ -69,4 +70,10 @@ class User(Base):
         back_populates="user",
         cascade="all, delete-orphan",
         foreign_keys="ExpenseSplit.user_id",
+    )
+
+    item_splits: Mapped[list["ItemSplit"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+        foreign_keys="ItemSplit.user_id",
     )
