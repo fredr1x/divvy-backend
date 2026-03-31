@@ -5,3 +5,7 @@ from app.models.group import Group
 from app.models.user_group import UserGroup
 from app.models.group_expense import GroupExpense
 from app.models.expense_split import ExpenseSplit
+from app.models.item import Item
+from app.models.item_split import ItemSplit
+from app.models.item import Item
+from app.models.item_split import ItemSplit

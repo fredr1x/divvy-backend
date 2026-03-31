@@ -42,7 +42,6 @@ def create_user_local(
         auth_provider="local",
     )
     db.add(user)
-    db.commit()
     db.refresh(user)
     return user
 
@@ -63,6 +62,5 @@ def create_google_user(
         google_sub=google_sub,
     )
     db.add(user)
-    db.commit()
     db.refresh(user)
     return user

@@ -1,5 +1,5 @@
-from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
+from itertools import chain
 
 from fastapi import HTTPException
 from sqlalchemy import select
@@ -7,9 +7,11 @@ from sqlalchemy.orm import Session, selectinload
 
 from app.models import ExpenseSplit, GroupExpense, UserGroup
 from app.models.enums import ShareType, SplitStatus, SplitType
-from app.schemas import UserRead
+
+from app.schemas import UserRead, ItemCreate, ItemUpdate
 from app.schemas.expense_split import AllExpensesByGroupAndUser, OwedAmountDetail, ReceivableAmountDetail
 from app.schemas.group_expense import GroupExpenseCreate, GroupExpenseUpdate
+
 from app.services.user_group_service import get_group_members
 
 
@@ -73,180 +75,219 @@ def get_all_expenses_by_group_id_and_user_id(
 def create_expense_split(
     db: Session,
     payload: GroupExpenseCreate,
-    group_expense_id: int
+    group_expense: GroupExpense
 ) -> None:
     group_members = get_group_members(db, payload.group_id)
-    validate_create_expense_request(group_members, payload)
-
-    share_type = payload.share_type
-    if share_type == ShareType.EQUAL:
-        calculate_and_save_equal_share_type(db, group_expense_id, group_members, payload)
-
-    elif share_type == ShareType.EXACT:
-        calculate_and_save_exact_share_type(db, group_expense_id, group_members, payload)
-
-    elif share_type == ShareType.PERCENTAGE:
-        calculate_and_save_percentage_share_type(db, group_expense_id, group_members, payload)
-    else:
-        raise HTTPException(status_code=400, detail="Unsupported share type")
+    owed_map = build_owed_amount_map(
+        group_members=group_members,
+        payer_id=payload.payer_id,
+        total_amount=payload.total_amount,
+        share_type=payload.share_type,
+        expense_members=payload.expense_members,
+        expense_items=payload.expense_items,
+        exact_share_amount=payload.exact_share_amount,
+        percentage_share_amount=payload.percentage_share_amount,
+    )
+    persist_snapshot_splits(db, group_expense.id, payload.payer_id, owed_map)
 
 
 def update_expense_split(
-        db: Session,
-        group_expense: GroupExpense,
-        payload: GroupExpenseUpdate
+    db: Session,
+    group_expense: GroupExpense,
+    payload: GroupExpenseUpdate,
 )-> None:
-    group_members = get_group_members(db, group_expense.group_id)
+    group_members: list[UserRead] = get_group_members(db, group_expense.group_id)
     total_amount = normalize_amount(payload.total_amount)
 
     if total_amount <= 0:
         raise HTTPException(status_code=400, detail="Total amount must be greater than zero")
-
-    payer_id = group_expense.payer_id
-    share_type = payload.share_type
 
     expense_splits = list(db.scalars(
         select(ExpenseSplit).where(ExpenseSplit.group_expense_id == group_expense.id)
     ).all())
 
-    # todo write if case to check if there is changes if no just return (go out of function)
-
-    if share_type == ShareType.EQUAL:
-        calculate_and_update_equal_share_type(db, group_expense.id, payer_id, total_amount, group_members, payload.expense_members, expense_splits)
-
-    elif share_type == ShareType.EXACT:
-        calculate_and_update_exact_share_type(db, group_expense.id,total_amount, payload.exact_share_amount, group_members, payload.expense_members, expense_splits)
-
-    elif share_type == ShareType.PERCENTAGE:
-        calculate_and_update_percentage_share_type(db,payer_id, total_amount, payload.percentage_share_amount, group_members, payload.expense_members, expense_splits)
-
-    else:
-        raise HTTPException(status_code=400, detail="Unsupported share type")
-
-def validate_create_expense_request(group_members: list[UserRead], payload: GroupExpenseCreate):
-    if not group_members:
-        raise HTTPException(status_code=404, detail="Group members not found")
-
-    member_ids = {member.id for member in group_members}
-    if payload.payer_id not in member_ids:
-        raise HTTPException(status_code=400, detail="Payer is not a member of this group")
-
-
-def calculate_and_save_equal_share_type(db: Session,
-                                        group_expense_id: int,
-                                        group_members: list[UserRead],
-                                        payload: GroupExpenseCreate):
-
-    expense_members = payload.expense_members
-    validate_group_members(group_members, expense_members, None)
-    total_amount = normalize_amount(payload.total_amount)
-
-    if total_amount <= 0:
-        raise HTTPException(status_code=400, detail="Total amount must be greater than zero")
-
-    amount_for_each_member = normalize_amount(total_amount / len(expense_members))
-    remainder = total_amount - (amount_for_each_member * len(expense_members))
-    payer_share = amount_for_each_member + remainder
-
-    active_members = [m for m in group_members if m.id in expense_members]
-    for member in active_members:
-        is_payer = member.id == payload.payer_id
-        amount = payer_share if is_payer else amount_for_each_member
-        build_expense(db,
-                     member.id,
-                     group_expense_id,
-                     amount,
-                     SplitType.ORIGINAL,
-                      is_payer
+    if expense_splits and all(split.status == SplitStatus.PAID for split in expense_splits):
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot recalculate splits for a fully settled expense"
         )
 
+    owed_map = build_owed_amount_map(
+        group_members=group_members,
+        payer_id=group_expense.payer_id,
+        total_amount=total_amount,
+        share_type=payload.share_type,
+        expense_members=payload.expense_members,
+        expense_items=payload.expense_items,
+        exact_share_amount=payload.exact_share_amount,
+        percentage_share_amount=payload.percentage_share_amount,
+    )
 
-def calculate_and_save_exact_share_type(db: Session,
-                                        group_expense_id: int,
-                                        group_members: list[UserRead],
-                                        payload: GroupExpenseCreate):
-    total_amount = normalize_amount(payload.total_amount)
-    if total_amount <= 0:
+    persist_snapshot_splits(db, group_expense.id, group_expense.payer_id, owed_map, expense_splits)
+
+
+def build_owed_amount_map(
+    group_members: list[UserRead],
+    payer_id: int,
+    total_amount: Decimal,
+    share_type: ShareType,
+    expense_members: list[int],
+    expense_items: list[ItemCreate | ItemUpdate] | None,
+    exact_share_amount: dict[int, Decimal] | None,
+    percentage_share_amount: dict[int, Decimal] | None,
+) -> dict[int, Decimal]:
+
+    validate_group_members(group_members, expense_members)
+    if payer_id not in set(expense_members):
+        raise HTTPException(status_code=400, detail="Payer must be included in expense members")
+
+    normalized_total = normalize_amount(total_amount)
+    if normalized_total <= 0:
         raise HTTPException(status_code=400, detail="Total amount must be greater than zero")
 
-    shares = validate_shares(payload.exact_share_amount, "exact")
-    validate_group_members(group_members, payload.expense_members, shares)
+    shares = calculate_member_shares(
+        share_type=share_type,
+        total_amount=normalized_total,
+        expense_members=expense_members,
+        payer_id=payer_id,
+        expense_items=expense_items,
+        exact_share_amount=exact_share_amount,
+        percentage_share_amount=percentage_share_amount,
+        group_members=group_members,
+    )
 
     total_shares = sum(shares.values(), Decimal("0.00"))
-    if total_shares != total_amount:
-        raise HTTPException(status_code=400, detail="Exact shares must sum to total amount")
+    if abs(total_shares - normalized_total) > Decimal("0.01"):
+        raise HTTPException(status_code=400, detail="Calculated shares must sum to total amount")
 
-    for member in group_members:
-        share = shares[member.id]
-        is_payer = member.id == payload.payer_id
-        amount = total_amount - share if is_payer else -share
-        build_expense(db,
-                      member.id,
-                      group_expense_id,
-                      amount,
-                      SplitType.ORIGINAL,
-                      is_payer
+    owed_map: dict[int, Decimal] = {}
+    for user_id in expense_members:
+        share = shares[user_id]
+        owed_map[user_id] = share if user_id == payer_id else -share
+    return owed_map
+
+
+def calculate_member_shares(
+    share_type: ShareType,
+    total_amount: Decimal,
+    expense_members: list[int],
+    payer_id: int,
+    expense_items: list[ItemCreate | ItemUpdate] | None,
+    exact_share_amount: dict[int, Decimal] | None,
+    percentage_share_amount: dict[int, Decimal] | None,
+    group_members: list[UserRead],
+) -> dict[int, Decimal]:
+
+    if share_type == ShareType.EQUAL:
+        count = len(expense_members)
+        each = normalize_amount(total_amount / count)
+        remainder = total_amount - (each * count)
+        shares = {user_id: each for user_id in expense_members}
+        shares[payer_id] = normalize_amount(shares[payer_id] + remainder)
+        return shares
+
+    if share_type == ShareType.ITEMIZED:
+        if not expense_items:
+            raise HTTPException(status_code=400, detail="Expense items must be provided")
+
+        validate_expense_items(group_members, expense_items, expense_members)
+        shares = {user_id: Decimal("0.00") for user_id in expense_members}
+
+        for item in expense_items:
+            count = len(item.assigned_user_ids)
+            each = normalize_amount(item.total_price / count)
+            remainder = item.total_price - (each * count)
+
+            for idx, user_id in enumerate(item.assigned_user_ids):
+                amount = each + remainder if idx == 0 else each
+                shares[user_id] = normalize_amount(shares[user_id] + amount)
+
+        return shares
+
+    if share_type == ShareType.EXACT:
+        if not exact_share_amount:
+            raise HTTPException(status_code=400, detail="Exact shares are required")
+
+        validate_shares(exact_share_amount, "exact")
+        normalized = {int(k): normalize_amount(v) for k, v in exact_share_amount.items()}
+        if set(normalized.keys()) != set(expense_members):
+            raise HTTPException(status_code=400, detail="Exact shares must match expense members")
+
+        return normalized
+
+    if share_type == ShareType.PERCENTAGE:
+        if not percentage_share_amount:
+            raise HTTPException(status_code=400, detail="Percentage shares are required")
+
+        validate_shares(percentage_share_amount, "percentage")
+        normalized = {int(k): normalize_amount(v) for k, v in percentage_share_amount.items()}
+        if set(normalized.keys()) != set(expense_members):
+            raise HTTPException(status_code=400, detail="Percentage shares must match expense members")
+
+        total_percentage = sum(normalized.values(), Decimal("0.00"))
+        if total_percentage != Decimal("100.00"):
+            raise HTTPException(status_code=400, detail="Percentage shares must sum to 100")
+
+        shares = {user_id: normalize_amount(total_amount * pct / Decimal("100.00")) for user_id, pct in normalized.items()}
+        remainder = total_amount - sum(shares.values(), Decimal("0.00"))
+        shares[payer_id] = normalize_amount(shares[payer_id] + remainder)
+
+        return shares
+
+    raise HTTPException(status_code=400, detail="Unsupported share type")
+
+
+def persist_snapshot_splits(
+    db: Session,
+    group_expense_id: int,
+    payer_id: int,
+    owed_map: dict[int, Decimal],
+    existing_splits: list[ExpenseSplit] | None = None
+) -> None:
+    if existing_splits is None:
+        existing_splits = list(db.scalars(
+            select(ExpenseSplit).where(ExpenseSplit.group_expense_id == group_expense_id)
+        ).all())
+
+    for split in existing_splits:
+        db.delete(split)
+
+    for user_id, owed_amount in owed_map.items():
+        build_expense(
+            db,
+            user_id,
+            group_expense_id,
+            owed_amount,
+            SplitType.ORIGINAL,
+            user_id == payer_id
         )
 
 
-def calculate_and_save_percentage_share_type(db: Session,
-                                             group_expense_id: int,
-                                             group_members: list[UserRead],
-                                             payload: GroupExpenseCreate
-):
-    total_amount = normalize_amount(payload.total_amount)
-    if total_amount <= 0:
-        raise HTTPException(status_code=400, detail="Total amount must be greater than zero")
-
-    percentages = validate_percentages(payload.percentage_share_amount)
-    validate_group_members(group_members, payload.expense_members, percentages)
-
-    remainder, shares = calculate_remainder_and_shares_for_percentage_type(group_members, percentages, total_amount)
-    shares[payload.payer_id] = normalize_amount(shares[payload.payer_id] + remainder)
-
-    for member in group_members:
-        share = shares[member.id]
-        is_payer = member.id == payload.payer_id
-        amount = total_amount - share if is_payer else -share
-        build_expense(db,
-                      member.id,
-                      group_expense_id,
-                      amount,
-                      SplitType.ORIGINAL,
-                      is_payer
-        )
-
-
-def calculate_remainder_and_shares_for_percentage_type(group_members: list[UserRead], percentages: dict[int, Decimal],
-                                                       total_amount: Decimal) -> tuple[Decimal, dict[int, Decimal]]:
-    shares: dict[int, Decimal] = {}
-    for member in group_members:
-        percent = percentages[member.id]
-        shares[member.id] = normalize_amount(total_amount * percent / Decimal("100.00"))
-
-    remainder = total_amount - sum(shares.values(), Decimal("0.00"))
-    return remainder, shares
-
-
-def build_expense(db: Session,
-                  member_id: int,
-                  group_expense_id: int,
-                  amount_for_each_member: Decimal,
-                  split_type: SplitType,
-                  payer: bool,
+def build_expense(
+    db: Session,
+    member_id: int,
+    group_expense_id: int,
+    amount_for_each_member: Decimal,
+    split_type: SplitType,
+    payer: bool,
+    refund_to_user_id: int | None = None
 ) -> None:
 
-    split = ExpenseSplit(user_id=member_id,
-                         group_expense_id=group_expense_id,
-                         owed_amount=amount_for_each_member,
-                         split_status=SplitStatus.PAYER if payer else SplitStatus.PENDING,
-                         split_type=split_type
+    split = ExpenseSplit(
+        user_id=member_id,
+        group_expense_id=group_expense_id,
+        owed_amount=amount_for_each_member,
+        status=SplitStatus.PAID if payer else SplitStatus.PENDING,
+        split_type=split_type,
+        refund_to_user_id=refund_to_user_id
     )
 
     db.add(split)
 
 
 def normalize_amount(value: Decimal | int | float) -> Decimal:
+    if not isinstance(value, Decimal):
+        value = Decimal(str(value))
     return value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
@@ -272,29 +313,15 @@ def validate_shares(
     return validated
 
 
-def validate_percentages(
-    share_map: dict[int, Decimal] | None,
-) -> dict[int, Decimal]:
-    percentages = validate_shares(share_map, "percentage")
-    for value in percentages.values():
-        if value > Decimal("100.00"):
-            raise HTTPException(status_code=400, detail="Percentages must be between 0 and 100")
-
-    total_percentage = sum(percentages.values(), Decimal("0.00"))
-    if total_percentage !=  Decimal("100.00"):
-        raise HTTPException(status_code=400, detail="Percentage shares must sum to 100")
-    return percentages
-
-
 def validate_group_members(
     group_members: list[UserRead],
     expense_members: list[int],
     shares: dict[int, Decimal] | None = None,
 ) -> None:
-    member_ids = {member.id for member in group_members}
+    group_member_ids = {member.id for member in group_members}
     expense_ids = set(expense_members)
 
-    unknown_members = expense_ids - member_ids
+    unknown_members = expense_ids - group_member_ids
     if unknown_members:
         raise HTTPException(status_code=400, detail="Expense members includes unknown members")
 
@@ -302,142 +329,39 @@ def validate_group_members(
         return
 
     share_ids = set(shares.keys())
-    unknown_members = share_ids - member_ids
+    unknown_members = share_ids - group_member_ids
     if unknown_members:
         raise HTTPException(status_code=400, detail="Share includes unknown members")
 
 
-def calculate_and_update_equal_share_type(
-    db: Session,
-    group_expense_id: int,
-    payer_id: int,
-    total_amount: Decimal,
+
+def validate_expense_items(
     group_members: list[UserRead],
-    expense_members: list[int],
-    expense_splits: list[ExpenseSplit]
-):
-    validate_group_members(group_members, expense_members, None)
+    expense_items: list[ItemCreate | ItemUpdate],
+    expense_members: list[int]
+) -> None:
+    for idx, item in enumerate(expense_items, start=1):
+        if not item.assigned_user_ids:
+            raise HTTPException(status_code=400, detail=f"Item #{idx} must have at least one assigned user")
 
-    existing_split_map = {split.user_id: split for split in expense_splits}
+        assigned_ids = item.assigned_user_ids
+        if len(assigned_ids) != len(set(assigned_ids)):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Item #{idx} has duplicate assigned users"
+            )
 
-    count = len(expense_members)
-    amount_for_each = normalize_amount(total_amount / count)
-    remainder = total_amount - (amount_for_each * count)
-    payer_share = amount_for_each + remainder
+    group_member_ids = {member.id for member in group_members}
+    all_assigned_user_ids = set(chain.from_iterable(item.assigned_user_ids for item in expense_items))
 
-    now = datetime.now()
+    unknown_user_ids = all_assigned_user_ids - group_member_ids
+    if unknown_user_ids:
+        raise HTTPException(status_code=400, detail="Expense items include unknown users")
 
-    removed_user_ids = set(existing_split_map.keys()) - set(expense_members)
-    for user_id in removed_user_ids:
-        split = existing_split_map[user_id]
+    invalid_users = all_assigned_user_ids - set(expense_members)
+    if invalid_users:
+        raise HTTPException(status_code=400, detail=f"Users {invalid_users} are assigned to items but not in expense members")
 
-        if split.split_status == SplitStatus.PAID:
-            db.add(ExpenseSplit(
-                user_id=payer_id,
-                group_expense_id=group_expense_id,
-                owed_amount=-abs(split.owed_amount),
-                split_status=SplitStatus.PENDING,
-                split_type=SplitType.REFUND,
-                refund_to_user_id=user_id,
-                created_at=now,
-                last_modified_at=now,
-            ))
-
-        db.delete(split)
-
-    new_user_ids = set(expense_members) - set(existing_split_map.keys())
-    for member in group_members:
-        if member.id not in new_user_ids:
-            continue
-
-        is_payer = member.id == payer_id
-        build_expense(
-            db,
-            member.id,
-            group_expense_id,
-            payer_share if is_payer else amount_for_each,
-            SplitType.ORIGINAL,
-            is_payer
-        )
-
-    for user_id, split in existing_split_map.items():
-        if user_id in removed_user_ids:
-            continue
-
-        if split.split_status == SplitStatus.PAID:
-            old_amount = abs(split.owed_amount)
-            new_amount = payer_share if user_id == payer_id else amount_for_each
-            diff = old_amount - new_amount
-
-            if diff > 0:
-                db.add(ExpenseSplit(
-                    user_id=payer_id,
-                    group_expense_id=group_expense_id,
-                    owed_amount=-diff,
-                    split_status=SplitStatus.PENDING,
-                    split_type=SplitType.REFUND,
-                    refund_to_user_id=user_id,
-                    created_at=now,
-                    last_modified_at=now,
-                ))
-            continue
-
-        is_payer = user_id == payer_id
-        split.owed_amount = payer_share if is_payer else -amount_for_each
-        split.last_modified_at = now
-
-    db.commit()
-
-def calculate_and_update_exact_share_type(
-    db: Session,
-    payer_id: int,
-    total_amount: Decimal,
-    exact_share_amount: dict[int, Decimal],
-    group_members: list[UserRead],
-    expense_members: list[int],
-    expense_splits: list[ExpenseSplit]
-):
-    shares = validate_shares(exact_share_amount, "exact")
-    validate_group_members(group_members, expense_members, shares)
-
-    total_shares = sum(shares.values(), Decimal("0.00"))
-    if total_shares != total_amount:
-        raise HTTPException(status_code=400, detail="Exact shares must sum to total amount")
-
-    update_and_save(db, expense_splits, payer_id, shares, total_amount)
-
-
-def calculate_and_update_percentage_share_type(
-    db: Session,
-    payer_id: int, total_amount: Decimal,
-    percentage_share_amount: dict[int, Decimal],
-    group_members: list[UserRead],
-    expense_members: list[int],
-    expense_splits: list[ExpenseSplit]
-):
-    percentages = validate_percentages(percentage_share_amount)
-    validate_group_members(group_members, expense_members, percentages)
-
-    remainder, shares = calculate_remainder_and_shares_for_percentage_type(group_members, percentages, total_amount)
-    shares[payer_id] = normalize_amount(shares[payer_id] + remainder)
-
-    update_and_save(db, expense_splits, payer_id, shares, total_amount)
-
-
-def update_and_save(
-        db: Session,
-        expense_splits: list[ExpenseSplit],
-        payer_id: int,
-        shares: dict[int, Decimal],
-        total_amount: Decimal
-):
-    now = datetime.now()
-    for split in expense_splits:
-        share = shares[split.user_id]
-        if split.user_id == payer_id:
-            split.owed_amount = total_amount - share
-        else:
-            split.owed_amount = -abs(share)
-        split.last_modified_at = now
-
-    db.commit()
+    unassigned_users = set(expense_members) - all_assigned_user_ids
+    if unassigned_users:
+        raise HTTPException(status_code=400, detail=f"Users {unassigned_users} are expense members but not assigned to any item")

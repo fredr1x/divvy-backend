@@ -9,7 +9,8 @@ class ExpenseSplitDetails(BaseModel):
     user_id: int
     owed_amount: Decimal
     split_type: SplitType
-    status: SplitStatus = Field(validation_alias="split_status")
+    status: SplitStatus
+    refund_to_user_id: int | None = None
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)

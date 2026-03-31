@@ -10,3 +10,4 @@ from app.schemas.group import GroupCreate, GroupRead, GroupUpdate
 from app.schemas.group_expense import GroupExpenseCreate, GroupExpenseRead, GroupExpenseUpdate
 from app.schemas.user_group import UserGroupRead, UserGroupAddMemberByEmail
 from app.schemas.expense_split import ExpenseSplitDetails, OwedAmountDetail, ReceivableAmountDetail, AllExpensesByGroupAndUser
+from app.schemas.item import ItemCreate, ItemUpdate
