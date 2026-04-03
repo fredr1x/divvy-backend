@@ -24,7 +24,6 @@ def get_group_by_id(
     return group
 
 
-# TODO add get_group_members_by_expense for update
 def get_group_members(
         db: Session,
         id: int

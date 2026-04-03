@@ -11,3 +11,4 @@ from app.schemas.group_expense import GroupExpenseCreate, GroupExpenseRead, Grou
 from app.schemas.user_group import UserGroupRead, UserGroupAddMemberByEmail
 from app.schemas.expense_split import ExpenseSplitDetails, OwedAmountDetail, ReceivableAmountDetail, AllExpensesByGroupAndUser
 from app.schemas.item import ItemCreate, ItemUpdate
+from app.schemas.group_media import GroupMediaCreate, GroupMediaRead

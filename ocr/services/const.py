@@ -2,10 +2,11 @@ import asyncio
 import os
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
 from pydantic import BaseModel, Field
 from fastapi import APIRouter
 from anthropic import AsyncAnthropic
-from ultralytics import YOLO
 import logging
 
 logger = logging.getLogger(__name__)
@@ -13,14 +14,31 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class AppState:
-    yolo: YOLO
+    yolo: Any | None
     vlm: AsyncAnthropic
+    detector_enabled: bool
+
+
+def _model_path() -> str:
+    return str((Path(__file__).resolve().parent / "detector.pt"))
+
+
+async def _load_detector() -> Any | None:
+    try:
+        from ultralytics import YOLO
+        return await asyncio.to_thread(YOLO, _model_path())
+    except Exception as exc:
+        logger.warning(
+            "Local detector disabled, OCR will run without crop step: %s",
+            exc,
+        )
+        return None
 
 
 @asynccontextmanager
 async def lifespan(router: APIRouter):
 
-    yolo_model = await asyncio.to_thread(YOLO, r"ocr\services\detector.pt")
+    yolo_model = await _load_detector()
 
     vlm_client = AsyncAnthropic(
         api_key=os.getenv("CLAUDE_API_KEY"),
@@ -28,9 +46,13 @@ async def lifespan(router: APIRouter):
         max_retries=2,
     )
 
-    router.state.models = AppState(yolo=yolo_model, vlm=vlm_client)
+    router.state.models = AppState(
+        yolo=yolo_model,
+        vlm=vlm_client,
+        detector_enabled=yolo_model is not None,
+    )
 
-    logger.info("Loaded YOLO and QWEN Client")
+    logger.info("Loaded OCR clients. detector_enabled=%s", yolo_model is not None)
 
     yield
 

@@ -9,3 +9,4 @@ from app.models.item import Item
 from app.models.item_split import ItemSplit
 from app.models.item import Item
 from app.models.item_split import ItemSplit
+from app.models.group_media import GroupMedia

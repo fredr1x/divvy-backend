@@ -11,10 +11,14 @@ async def preprocess_receipt(state: AppState, img_bytes) -> str:
 
     img_array = np.frombuffer(img_bytes, np.uint8)
     img = cv2.imdecode(img_array, cv2.IMREAD_COLOR)
+    if img is None:
+        raise ValueError("Unable to decode uploaded image")
 
-    results = await asyncio.to_thread(state.yolo.predict, img, verbose=False)
-
-    cropped = _crop_receipt(img, results)
+    if state.yolo is not None:
+        results = await asyncio.to_thread(state.yolo.predict, img, verbose=False)
+        cropped = _crop_receipt(img, results)
+    else:
+        cropped = img
 
     b64 = base64.b64encode(cv2.imencode(".jpg", cropped)[1]).decode()
 
