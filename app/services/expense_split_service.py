@@ -15,6 +15,18 @@ from app.schemas.group_expense import GroupExpenseCreate, GroupExpenseUpdate
 from app.services.user_group_service import get_group_members
 
 
+def get_expense_split_by_id(
+        db: Session,
+        expense_split_id: int
+)-> ExpenseSplit:
+    expense_split: ExpenseSplit = db.scalar(select(ExpenseSplit).where(ExpenseSplit.id == expense_split_id))
+
+    if not expense_split:
+        raise HTTPException(status_code=404, detail="Expense split not found")
+
+    return expense_split
+
+
 def get_all_expenses_by_group_id_and_user_id(
         db: Session,
         group_id: int,

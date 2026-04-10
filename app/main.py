@@ -9,6 +9,7 @@ from app.routers import expense_split_router
 from ocr.routers import ocr_router
 from app.routers import group_media_router
 from app.routers import minio_router
+from app.routers import virtual_card_router
 
 from dotenv import load_dotenv, find_dotenv
 import logging
@@ -44,6 +45,8 @@ app.include_router(ocr_router)
 app.include_router(group_media_router)
 
 app.include_router(minio_router)
+
+app.include_router(virtual_card_router)
 
 @app.get("/")
 def health_check():

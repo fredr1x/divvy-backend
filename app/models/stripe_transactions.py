@@ -56,5 +56,5 @@ class StripeTransaction(Base):
     )
 
     updated_at: Mapped[datetime] = mapped_column(
-        DateTime, onupdate=datetime.now
+        DateTime, onupdate=datetime.now, nullable=True
     )

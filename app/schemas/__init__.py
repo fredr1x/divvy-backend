@@ -13,3 +13,4 @@ from app.schemas.expense_split import ExpenseSplitDetails, OwedAmountDetail, Rec
 from app.schemas.item import ItemCreate, ItemUpdate
 from app.schemas.group_media import GroupMediaCreate, GroupMediaRead
 from app.schemas.stripe import StripeCreateCardResponse
+from app.schemas.virtual_card import VirtualCardRead, VirtualCardDeposit, PayDebtRequest, PayDebtResponse

@@ -22,8 +22,7 @@ def get_next_card_number(db: Session):
 
 
 def update_next_card_number(db: Session, new_next_card_number: int):
-     next_card: StripeNextCard = get_next_card(db)
-     next_card.number = new_next_card_number
-     db.refresh(next_card)
-     db.flush()
+    next_card: StripeNextCard = get_next_card(db)
+    next_card.number = new_next_card_number
+    db.flush()
 

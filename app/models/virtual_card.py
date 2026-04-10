@@ -25,7 +25,7 @@ class VirtualCard(Base):
     )
 
     card_number: Mapped[str] = mapped_column(
-        String(14), nullable=False, unique=True
+        String(128), nullable=False, unique=True
     )
 
     card_last4: Mapped[str] = mapped_column(
