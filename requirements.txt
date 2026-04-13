@@ -36,6 +36,5 @@ stripe==7.11.0
 # OCR & ML
 ultralytics==8.4.9
 anthropic==0.86.0
-opencv-python-headless==4.13.0.92
 pillow==12.1.1
 numpy==2.4.3
