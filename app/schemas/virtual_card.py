@@ -27,4 +27,4 @@ class PayDebtRequest(BaseModel):
 class PayDebtResponse(BaseModel):
     expense_split_id: int
     expense_split_status: SplitStatus
-    virtual_card_balance: Decimal
+    card_balance: Decimal
