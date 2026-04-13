@@ -9,13 +9,13 @@ from app.schemas.group_expense import (
     GroupExpenseRead,
     GroupExpenseUpdate,
 )
-from app.services.group_expense import (
+from app.services.group_expense_service import (
     create_group_expense as create_group_expense_service,
 )
-from app.services.group_expense import (
-    get_group_expense as get_group_expense_service,
+from app.services.group_expense_service import (
+    get_group_expense_by_group_id as get_group_expense_service,
 )
-from app.services.group_expense import (
+from app.services.group_expense_service import (
     update_group_expense as update_group_expense_service,
 )
 
