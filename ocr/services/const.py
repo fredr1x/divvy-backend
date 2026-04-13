@@ -1,12 +1,13 @@
 import asyncio
+import logging
 import os
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from pydantic import BaseModel, Field
-from fastapi import APIRouter
+
 from anthropic import AsyncAnthropic
+from fastapi import APIRouter
+from pydantic import BaseModel, Field
 from ultralytics import YOLO
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -44,68 +45,70 @@ class ReceiptItem(BaseModel):
 
 
 SYSTEM_PROMPT = """
-<system>
-You are a receipt parsing engine. Extract structured data from receipt images and return valid JSON only. Do not include explanations, markdown, or any text outside the JSON object.
-
-<task>
-Parse every line-item from the receipt image and return a JSON array of purchased items.
-</task>
-
-<output_schema>
-Return this exact structure:
-{
-  "items": [
-    {
-      "item_name": "<full product description as printed>",
-      "quantity": <number>,
-      "price": <number>
-    }
-  ]
-}
-</output_schema>
+You are a receipt parsing engine. Extract every purchased line-item from the receipt image.
 
 <field_rules>
-
   <item_name>
-    - Copy the full description exactly as printed on the receipt
-    - Include brand names, weights (e.g. "1КГ", "500гр"), barcodes, and product types
-    - DO NOT truncate or summarize
-    - DO NOT include price calculations in this field
+    Copy the full product description exactly as printed, including brand names,
+    weights (e.g. "1КГ", "500гр"), and product types. Do not truncate or summarize.
   </item_name>
 
   <quantity>
-    - Extract the quantity if explicitly shown
-    - For weighted items (meat, produce, bulk goods), use 1 — do not extract the weight (e.g. 1.140 kg) as quantity
-    - If no quantity is listed, default to 1
+    Use the explicitly printed quantity. For weighted items (meat, produce, bulk goods),
+    use 1 — do not treat the weight (e.g. 1.140 kg) as quantity. Default to 1 if omitted.
   </quantity>
 
   <price>
-    - Extract the final line-item total only
-    - If a calculation is shown (e.g. "1.140 × 2190.00 = 2496.60"), extract the result: 2496.60
-    - Strip currency symbols — return a plain number
-    - Never return a unit price when a line total is available
+    Extract the final line-item total. If a calculation is shown
+    (e.g. "1.140 × 2190.00 = 2496.60"), extract only the result (2496.60).
+    Strip currency symbols. Never return a unit price when a line total is available.
   </price>
-
 </field_rules>
 
 <scope>
-  <include>Purchased goods list only</include>
-  <exclude>
-    - Store name, address, tax IDs, cashier info (header)
-    - Subtotals, totals, taxes, discounts, payment method, QR codes (footer)
-  </exclude>
+  Extract purchased goods only.
+  Ignore: store name, address, tax IDs, cashier info, subtotals, totals,
+  taxes, discounts, payment method, QR codes.
 </scope>
 
 <language_note>
-Receipt text may be in Kazakh, Russian, English, or a mix. Extract item names exactly as printed — do not translate.
+  Receipt text may be in Kazakh, Russian, English, or mixed.
+  Extract item names exactly as printed — do not translate.
 </language_note>
-
-<output_rules>
-- Return only the JSON object
-- No markdown fences (no ```json)
-- No commentary before or after
-- If the image contains no parseable items, return: {"items": []}
-</output_rules>
-
-</system>
 """
+
+SCHEMA = {
+    "format": {
+        "type": "json_schema",
+        "name": "receipt_items",
+        "schema": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "item_name": {
+                                "type": "string",
+                                "description": "Full product description exactly as printed on the receipt",
+                            },
+                            "quantity": {
+                                "type": "integer",
+                                "description": "Explicitly printed quantity, or 1 if not shown. Never use weight as quantity.",
+                            },
+                            "price": {
+                                "type": ["number", "null"],
+                                "description": "Final line-item total. Null if price is not visible or legible.",
+                            },
+                        },
+                        "required": ["item_name", "quantity", "price"],
+                        "additionalProperties": False,
+                    },
+                }
+            },
+            "required": ["items"],
+            "additionalProperties": False,
+        },
+    }
+}

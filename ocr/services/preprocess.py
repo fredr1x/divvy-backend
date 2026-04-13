@@ -3,8 +3,8 @@ import base64
 
 import cv2
 import numpy as np
-from ocr.services.const import AppState
 
+from ocr.services.const import AppState
 
 
 async def preprocess_receipt(state: AppState, img_bytes) -> str:
