@@ -12,8 +12,25 @@ router = APIRouter(prefix="/expense-split", tags=["expense split"])
 
 @router.get("/get-all/{group_id}")
 def get_all_by_group_id(
-        group_id: int,
-        db: Session = Depends(get_db),
-        current_user: User = Depends(get_current_user)
+    group_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> AllExpensesByGroupAndUser:
+    """
+    Retrieve all expenses and splits for a group from current user's perspective.
+
+    Gets detailed information about expenses in the group and how much
+    the current user owes or is owed.
+
+    Args:
+        group_id: The group ID
+        db: Database session
+        current_user: The authenticated user
+
+    Returns:
+        AllExpensesByGroupAndUser: Expenses and settlement amounts
+
+    Raises:
+        HTTPException 404: If group not found
+    """
     return get_all_expenses_by_group_id_and_user_id(db, group_id, current_user.id)
