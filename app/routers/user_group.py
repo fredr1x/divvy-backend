@@ -6,13 +6,13 @@ from app.dependencies import get_current_user
 from app.models.user import User
 from app.schemas.user import UserRead
 from app.schemas.user_group import UserGroupAddMemberByEmail, UserGroupRead
-from app.services.user_group_service import (
+from app.services.user.user_group_service import (
     get_group_members,
 )
-from app.services.user_group_service import (
+from app.services.user.user_group_service import (
     invite_to_group_by_email as add_to_group_by_email_service,
 )
-from app.services.user_group_service import (
+from app.services.user.user_group_service import (
     join_by_invitation_link as join_by_invitation_link_service,
 )
 

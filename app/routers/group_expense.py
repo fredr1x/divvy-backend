@@ -4,18 +4,18 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.dependencies import get_current_user
 from app.models import User
-from app.schemas.group_expense import (
+from app.schemas import (
     GroupExpenseCreate,
     GroupExpenseRead,
     GroupExpenseUpdate,
 )
-from app.services.group_expense_service import (
+from app.services.expense.group_expense_service import (
     create_group_expense as create_group_expense_service,
 )
-from app.services.group_expense_service import (
+from app.services.expense.group_expense_service import (
     get_group_expense_by_group_id as get_group_expense_service,
 )
-from app.services.group_expense_service import (
+from app.services.expense.group_expense_service import (
     update_group_expense as update_group_expense_service,
 )
 

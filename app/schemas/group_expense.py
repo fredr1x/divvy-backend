@@ -4,7 +4,7 @@ from typing import Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models.enums import ShareType, Currency
+from app.models.enums import Currency, ShareType
 from app.schemas.expense_split import ExpenseSplitDetails
 from app.schemas.item import ItemCreate, ItemUpdate
 
@@ -22,6 +22,7 @@ class GroupExpenseCreate(BaseModel):
     exact_share_amount: Optional[dict[int, Decimal]] = None
     percentage_share_amount: Optional[dict[int, Decimal]] = None
 
+
 class GroupExpenseRead(BaseModel):
     id: int
     payer_id: int
@@ -34,6 +35,7 @@ class GroupExpenseRead(BaseModel):
     expenses_split: list[ExpenseSplitDetails] = Field(validation_alias="splits")
 
     model_config = ConfigDict(from_attributes=True)
+
 
 class GroupExpenseUpdate(BaseModel):
     id: int

@@ -3,16 +3,16 @@ from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.schemas.group import GroupCreate, GroupRead, GroupUpdate
-from app.services.group_service import (
+from app.services.group.group_service import (
     create_group as create_group_service,
 )
-from app.services.group_service import (
+from app.services.group.group_service import (
     get_group_by_id as get_group_by_id_service,
 )
-from app.services.group_service import (
+from app.services.group.group_service import (
     get_invitation_link_by_group_id,
 )
-from app.services.group_service import (
+from app.services.group.group_service import (
     update_group as update_group_service,
 )
 

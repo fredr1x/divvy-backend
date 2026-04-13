@@ -1,9 +1,10 @@
 from datetime import datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 from app.models.enums import SplitStatus, SplitType
+
 
 class ExpenseSplitDetails(BaseModel):
     user_id: int
@@ -20,9 +21,11 @@ class OwedAmountDetail(BaseModel):
     amount: Decimal
     to_user_id: int
 
+
 class ReceivableAmountDetail(BaseModel):
     amount: Decimal
     from_user_id: int
+
 
 class AllExpensesByGroupAndUser(BaseModel):
     group_id: int

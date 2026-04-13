@@ -5,7 +5,9 @@ from app.db.session import get_db
 from app.dependencies import get_current_user
 from app.models.user import User
 from app.schemas import AllExpensesByGroupAndUser
-from app.services.expense_split_service import get_all_expenses_by_group_id_and_user_id
+from app.services.expense.expense_split_service import (
+    get_all_expenses_by_group_id_and_user_id,
+)
 
 router = APIRouter(prefix="/expense-split", tags=["expense split"])
 

@@ -8,14 +8,19 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.security import verify_password
 from app.db.session import get_db
-from app.schemas.auth import LoginRequest, LogoutRequest, RefreshRequest, TokenPair
-from app.schemas.user import UserCreate
-from app.services.auth_service import (
+from app.schemas import (
+    LoginRequest,
+    LogoutRequest,
+    RefreshRequest,
+    TokenPair,
+    UserCreate,
+)
+from app.services.auth.auth_service import (
     issue_token_pair,
     revoke_refresh_token,
     rotate_refresh_token,
 )
-from app.services.user_service import (
+from app.services.user.user_service import (
     create_google_user,
     create_user_local,
     get_user_by_email,
