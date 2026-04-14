@@ -1,4 +1,4 @@
-from fastapi import APIRouter, UploadFile, File, Depends
+from fastapi import APIRouter, Depends, File, UploadFile
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -6,16 +6,21 @@ from app.dependencies import get_current_user
 from app.models import User
 from app.models.enums.media_category import MediaCategory
 from app.schemas import GroupMediaCreate, GroupMediaRead
-from app.services.group_media_service import get_group_media, get_all_group_media, create_group_media
-from app.services.minio_service import minio_service
+from app.services.group.group_media_service import (
+    create_group_media,
+    get_all_group_media,
+    get_group_media,
+)
+from app.services.minio.minio_service import minio_service
 
 router = APIRouter(prefix="/group-media", tags=["group media"])
+
 
 @router.get("/{id}")
 def get_group_media_by_id(
     id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
 ) -> GroupMediaRead:
     return get_group_media(id, db, current_user.id)
 
@@ -24,8 +29,8 @@ def get_group_media_by_id(
 def get_all_by_group_id(
     group_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-)-> list[GroupMediaRead]:
+    current_user: User = Depends(get_current_user),
+) -> list[GroupMediaRead]:
     return get_all_group_media(group_id, db, current_user.id)
 
 
@@ -35,12 +40,14 @@ def upload_receipt(
     expense_id: int | None = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    files: list[UploadFile] = File(...)
+    files: list[UploadFile] = File(...),
 ):
     created_media = []
 
     for f in files:
-        key: str = minio_service.generate_object_key(group_id, MediaCategory.RECEIPT.name, f.filename)
+        key: str = minio_service.generate_object_key(
+            group_id, MediaCategory.RECEIPT.name, f.filename
+        )
 
         payload = GroupMediaCreate(
             group_id=group_id,

@@ -7,3 +7,4 @@ from app.routers.expense_split import router as expense_split_router
 from app.routers.group_media import router as group_media_router
 from app.routers.minio import router as minio_router
 from app.routers.virtual_card import router as virtual_card_router
+from app.routers.extract_receipt import router as scan_receipt

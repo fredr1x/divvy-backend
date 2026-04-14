@@ -1,7 +1,9 @@
 from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict
+
 from app.models.enums.currency import Currency
+
 
 class GroupUpdate(BaseModel):
     id: int

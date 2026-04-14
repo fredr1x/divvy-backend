@@ -1,25 +1,16 @@
-import os
 from typing import Generator
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql+psycopg2://divvy:divvy@divvy-db:5432/divvy-db"
-)
+from app.core.config import settings
 
-engine = create_engine(
-    DATABASE_URL,
-    echo=True,
-    future=True
-)
+DATABASE_URL = settings.DATABASE_URL
 
-SessionLocal = sessionmaker(
-    bind=engine,
-    autoflush=False,
-    autocommit=False
-)
+engine = create_engine(DATABASE_URL, echo=True, future=True)
+
+SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+
 
 def get_db() -> Generator[Session, None, None]:
     db = SessionLocal()

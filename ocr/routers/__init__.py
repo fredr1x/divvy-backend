@@ -1,1 +1,0 @@
-from ocr.routers.extract_receipt import router as ocr_router

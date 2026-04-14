@@ -8,17 +8,24 @@ from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.security import verify_password
 from app.db.session import get_db
-from app.schemas.auth import LoginRequest, LogoutRequest, RefreshRequest, TokenPair
-from app.schemas.user import UserCreate
-from app.services.auth_service import (
+from app.schemas import (
+    LoginRequest,
+    LogoutRequest,
+    RefreshRequest,
+    TokenPair,
+    UserCreate,
+)
+from app.services.auth.auth_service import (
     issue_token_pair,
     revoke_refresh_token,
     rotate_refresh_token,
 )
-from app.services.user_service import (create_google_user,
-                                       create_user_local,
-                                       get_user_by_email,
-                                       get_user_by_google_sub)
+from app.services.user.user_service import (
+    create_google_user,
+    create_user_local,
+    get_user_by_email,
+    get_user_by_google_sub,
+)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -29,6 +36,22 @@ GOOGLE_TOKENINFO_URL = "https://oauth2.googleapis.com/tokeninfo"
 
 @router.post("/register", response_model=TokenPair)
 def register(payload: UserCreate, db: Session = Depends(get_db)) -> TokenPair:
+    """
+    Register a new user with email and password.
+
+    Creates a new local user account with the provided email and password.
+    Returns a token pair (access and refresh tokens) for immediate authentication.
+
+    Args:
+        payload: User creation data containing email, password, first_name, last_name
+        db: Database session
+
+    Returns:
+        TokenPair: Access token and refresh token for the newly registered user
+
+    Raises:
+        HTTPException 400: If email is already registered
+    """
 
     if get_user_by_email(db, payload.email.__str__()):
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -47,6 +70,22 @@ def register(payload: UserCreate, db: Session = Depends(get_db)) -> TokenPair:
 
 @router.post("/login", response_model=TokenPair)
 def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenPair:
+    """
+    Register a new user with email and password.
+
+    Creates a new local user account with the provided email and password.
+    Returns a token pair (access and refresh tokens) for immediate authentication.
+
+    Args:
+        payload: User creation data containing email, password, first_name, last_name
+        db: Database session
+
+    Returns:
+        TokenPair: Access token and refresh token for the newly registered user
+
+    Raises:
+        HTTPException 400: If email is already registered
+    """
     user = get_user_by_email(db, payload.email.__str__())
 
     if not user or not user.password:
@@ -60,9 +99,23 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenPair:
 
 
 @router.post("/refresh", response_model=TokenPair)
-def refresh_token(
-    payload: RefreshRequest, db: Session = Depends(get_db)
-) -> TokenPair:
+def refresh_token(payload: RefreshRequest, db: Session = Depends(get_db)) -> TokenPair:
+    """
+    Refresh an expired access token using a valid refresh token.
+
+    Rotates the refresh token and issues a new access token pair.
+    Maintains session continuity without re-entering credentials.
+
+    Args:
+        payload: Contains the refresh token
+        db: Database session
+
+    Returns:
+        TokenPair: New access token and rotated refresh token
+
+    Raises:
+        HTTPException 401: If refresh token is invalid or expired
+    """
     result = rotate_refresh_token(db, payload.refresh_token)
     if not result:
         raise HTTPException(status_code=401, detail="Invalid refresh token")
@@ -72,12 +125,33 @@ def refresh_token(
 
 @router.post("/logout")
 def logout(payload: LogoutRequest, db: Session = Depends(get_db)) -> dict[str, bool]:
+    """
+    Revoke the user's refresh token and logout.
+
+    Invalidates the provided refresh token, preventing further token rotations.
+
+    Args:
+        payload: Contains the refresh token to revoke
+        db: Database session
+
+    Returns:
+        dict: Contains 'revoked' boolean indicating successful revocation
+    """
     revoked = revoke_refresh_token(db, payload.refresh_token)
     return {"revoked": revoked}
 
 
 @router.get("/google/login")
 def google_login() -> RedirectResponse:
+    """
+    Initiate Google OAuth2 login flow.
+
+    Redirects user to Google's authentication server.
+    Part of OAuth2 authorization code flow.
+
+    Returns:
+        RedirectResponse: Redirect to Google OAuth2 login page
+    """
     params = {
         "client_id": settings.GOOGLE_CLIENT_ID,
         "redirect_uri": settings.GOOGLE_REDIRECT_URI,
@@ -95,6 +169,22 @@ def google_callback(
     code: str = Query(...),
     db: Session = Depends(get_db),
 ) -> TokenPair:
+    """
+    Handle OAuth2 callback from Google after user authentication.
+
+    Exchanges authorization code for ID token, verifies with Google,
+    and creates or links Google account with existing user.
+
+    Args:
+        code: Authorization code from Google OAuth2
+        db: Database session
+
+    Returns:
+        TokenPair: Access token and refresh token for authenticated user
+
+    Raises:
+        HTTPException 400: If Google token exchange, verification, or profile is invalid
+    """
     token_response = httpx.post(
         GOOGLE_TOKEN_URL,
         data={
