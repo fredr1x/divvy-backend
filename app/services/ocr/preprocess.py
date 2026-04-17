@@ -26,7 +26,6 @@ async def preprocess_receipt(state: AppState, img_bytes) -> str:
 
 
 def _crop_receipt(img: np.ndarray, results) -> np.ndarray:
-    # If YOLO found nothing, return original — don't crash
     if not results or len(results[0].boxes) == 0:
         return img
 
