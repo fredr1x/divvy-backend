@@ -26,5 +26,5 @@ class CardBalance(Base):
     )
 
     __table_args__ = (
-        UniqueConstraint('card_id', 'currency', name='unique_card_currency')
+        UniqueConstraint('card_id', 'currency', name='unique_card_currency'),
     )

@@ -7,9 +7,9 @@ from sqlalchemy.orm import Session
 from app.models import User, VirtualCard
 from app.models.card_balance import CardBalance
 from app.models.enums import Currency
+from app.schemas import CardBalanceConverted
 
-from app.services.virtual_card_service import get_virtual_card_by_user_id
-from app.services.currency_service import CurrencyService
+from app.services.currency.currency_service import CurrencyService
 
 def get_card_balance_by_card_id_and_currency(
     db: Session,
@@ -37,7 +37,7 @@ def deposit_balance(
         card_balance = CardBalance(
             card_id=card_id,
             currency=currency,
-            balance=amount
+            balance=Decimal("0.0")
         )
 
         db.add(card_balance)
@@ -64,7 +64,12 @@ def convert_card_balance(
     if from_currency == to_currency:
         raise HTTPException(status_code=400, detail="Currency cannot be the same")
 
-    virtual_card: VirtualCard = get_virtual_card_by_user_id(db, current_user.id)
+    virtual_card: VirtualCard = db.scalar(
+        select(VirtualCard).where(VirtualCard.user_id == current_user.id)
+    )
+
+    if not virtual_card:
+        raise HTTPException(status_code=404, detail="Virtual card not found")
 
     if virtual_card.id != card_id:
         raise HTTPException(status_code=400, detail="Virtual card id mismatch")
@@ -77,22 +82,30 @@ def convert_card_balance(
     if card_balance_from.balance < amount:
         raise HTTPException(status_code=400, detail="Not enough balance to convert")
 
-    card_balance_to = get_card_balance_by_card_id_and_currency(db, virtual_card.id, to_currency)
+    converted_amount: Decimal = CurrencyService.convert_amount(db, amount, from_currency, to_currency)
 
-    currency_rate = CurrencyService.get_currency_rate(db, card_balance_from.currency).rate
-    converted_balance: Decimal = Decimal(amount * currency_rate)
     card_balance_from.balance -= amount
 
-    if not card_balance_to:
-        CardBalance(
+    card_balance_to = get_card_balance_by_card_id_and_currency(db, virtual_card.id, to_currency)
+
+    if card_balance_to:
+        card_balance_to.balance += converted_amount
+
+    else:
+        card_balance_to = CardBalance(
             card_id=virtual_card.id,
             currency=to_currency,
-            balance=converted_balance
+            balance=converted_amount
         )
 
         db.add(card_balance_to)
 
-    card_balance_to.balance += converted_balance
     db.flush()
-    db.refresh(card_balance_from)
     db.refresh(card_balance_to)
+    db.refresh(card_balance_from)
+
+    return CardBalanceConverted(
+        card_id=virtual_card.id,
+        card_balance_to=card_balance_to.balance,
+        card_balance_from=card_balance_from.balance,
+    )
