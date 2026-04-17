@@ -1,7 +1,12 @@
 import logging
 
+from contextlib import asynccontextmanager
 from dotenv import find_dotenv, load_dotenv
 from fastapi import FastAPI
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from zoneinfo import ZoneInfo
+
+from app.jobs.currency_rates_job import update_currency_rates
 
 from app.routers import (
     auth_router,
@@ -17,17 +22,39 @@ from app.routers import (
 )
 
 logging.basicConfig(
-    level=logging.WARNING,  # default for everything
+    level=logging.WARNING,
     format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
     datefmt="%H:%M:%S",
 )
 
-# Only elevate your own package
 logging.getLogger("app").setLevel(logging.DEBUG)
 
 
 load_dotenv(find_dotenv())
-app = FastAPI(title="Divvy API")
+
+scheduler = AsyncIOScheduler(timezone=ZoneInfo("UTC"))
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    scheduler.add_job(
+        update_currency_rates,
+        trigger="cron",
+        hour=0,
+        minute=30,
+        id="update_currency_rates",
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+        misfire_grace_time=3600,
+    )
+    scheduler.start()
+
+    try:
+        yield
+    finally:
+        scheduler.shutdown(wait=False)
+
+app = FastAPI(title="Divvy API", lifespan=lifespan)
 
 app.include_router(auth_router)
 
