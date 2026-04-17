@@ -1,7 +1,6 @@
 from datetime import datetime
-from decimal import Decimal
 
-from sqlalchemy import Integer, ForeignKey, String, Numeric, Boolean, DateTime
+from sqlalchemy import Integer, ForeignKey, String, Boolean, DateTime
 from sqlalchemy.orm import mapped_column, Mapped
 
 from app.db.base import Base
@@ -37,10 +36,6 @@ class VirtualCard(Base):
     card_exp_year: Mapped[int] = mapped_column(Integer)
 
     card_brand: Mapped[str] = mapped_column(String(64))
-
-    balance: Mapped[Decimal] = mapped_column(
-        Numeric(12, 2), nullable=False
-    )
 
     is_active: Mapped[bool] = mapped_column(
         Boolean, default=True

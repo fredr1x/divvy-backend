@@ -7,12 +7,18 @@ from sqlalchemy.orm import Session
 from stripe.error import StripeError
 
 from app.models import ExpenseSplit, GroupExpense
+from app.models.card_balance import CardBalance
 from app.models.enums import Currency, SplitStatus, Type
 from app.models.user import User
 from app.models.virtual_card import VirtualCard
 from app.schemas import PayDebtResponse
 from app.schemas.stripe import StripeCreateCardResponse
 from app.schemas.virtual_card import VirtualCardRead
+from app.services.card.card_balance_service import (
+    deposit_balance,
+    get_card_balance_by_card_id_and_currency,
+)
+from app.services.currency.currency_service import CurrencyService
 from app.services.expense.expense_split_service import get_expense_split_by_id
 from app.services.expense.group_expense_service import get_group_expense_by_id
 from app.services.stripe.stripe_service import StripeService
@@ -32,7 +38,17 @@ def get_virtual_card_by_user_id(db: Session, user_id: int) -> VirtualCard:
 
 def get_virtual_card_by_user(db: Session, current_user: User) -> VirtualCardRead:
     virtual_card = get_virtual_card_by_user_id(db, current_user.id)
-    return VirtualCardRead.model_validate(virtual_card)
+    card_balance: CardBalance | None = get_card_balance_by_card_id_and_currency(
+        db, virtual_card.id, Currency.USD
+    )
+
+    return VirtualCardRead(
+        id=virtual_card.id,
+        stripe_customer_id=virtual_card.stripe_customer_id,
+        card_number=virtual_card.card_number,
+        card_last4=virtual_card.card_last4,
+        balance=card_balance.balance if card_balance else Decimal("0.0"),
+    )
 
 
 def create_virtual_card(db: Session, current_user: User) -> VirtualCardRead:
@@ -60,7 +76,6 @@ def create_virtual_card(db: Session, current_user: User) -> VirtualCardRead:
             card_exp_month=stripe_data.card_exp_month,
             card_exp_year=stripe_data.card_exp_year,
             card_brand=stripe_data.card_brand,
-            balance=Decimal("0.0"),
             is_active=True,
         )
 
@@ -68,7 +83,20 @@ def create_virtual_card(db: Session, current_user: User) -> VirtualCardRead:
         db.flush()
         db.refresh(new_card)
 
-        return VirtualCardRead.model_validate(new_card)
+        deposit_balance(
+            db=db,
+            card_id=new_card.id,
+            amount=Decimal("0.0"),
+            currency=Currency.USD,
+        )
+
+        return VirtualCardRead(
+            id=new_card.id,
+            stripe_customer_id=new_card.stripe_customer_id,
+            card_number=new_card.card_number,
+            card_last4=new_card.card_last4,
+            balance=Decimal("0.0"),
+        )
 
     except StripeError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -87,18 +115,32 @@ def deposit_virtual_card(
     if not virtual_card:
         raise HTTPException(status_code=404, detail="Virtual card not found")
 
-    if amount <= 10:
-        raise HTTPException(status_code=400, detail="Amount must be greater than 10")
+    amount_usd = amount if currency == Currency.USD \
+                    else CurrencyService.convert_amount(db,
+                                                        amount,
+                                                        currency,
+                                                        Currency.USD
+                                                        )
+
+
+
+    if amount_usd < 0.50:
+        raise HTTPException(status_code=400, detail="Amount must be greater than 0.50$")
 
     try:
         payment_intent = StripeService.deposit_funds(
             customer_id=virtual_card.stripe_customer_id,
             payment_method_id=virtual_card.stripe_payment_method_id,
+            amount=amount_usd,
+            currency=Currency.USD,
+        )
+
+        card_balance = deposit_balance(
+            db=db,
+            card_id=virtual_card.id,
             amount=amount,
             currency=currency,
         )
-
-        virtual_card.balance += amount
 
         create_transaction(
             db=db,
@@ -114,7 +156,13 @@ def deposit_virtual_card(
             metadata=payment_intent.metadata,
         )
 
-        return VirtualCardRead.model_validate(virtual_card)
+        return VirtualCardRead(
+            id=virtual_card.id,
+            stripe_customer_id=virtual_card.stripe_customer_id,
+            card_number=virtual_card.card_number,
+            card_last4=virtual_card.card_last4,
+            balance=card_balance.balance,
+        )
 
     except StripeError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -135,9 +183,14 @@ def pay_debt(expense_split_id: int, current_user: User, db: Session) -> PayDebtR
 
     virtual_card: VirtualCard = get_virtual_card_by_user_id(db, current_user.id)
 
-    if virtual_card.balance < abs(expense_split.owed_amount):
+    card_balance = get_card_balance_by_card_id_and_currency(
+        db, virtual_card.id, group_expense.currency
+    )
+
+    if not card_balance or card_balance.balance < abs(expense_split.owed_amount):
         raise HTTPException(
-            status_code=400, detail="Not enough balance on virtual card"
+            status_code=400,
+            detail=f"Not enough balance in {group_expense.currency.value}",
         )
 
     try:
@@ -150,7 +203,7 @@ def pay_debt(expense_split_id: int, current_user: User, db: Session) -> PayDebtR
             description=f"Paying debt {expense_split.id}",
         )
 
-        virtual_card.balance -= abs(expense_split.owed_amount)
+        card_balance.balance -= abs(expense_split.owed_amount)
 
         expense_split.status = SplitStatus.PAID
         expense_split.paid_at = datetime.now()
@@ -172,12 +225,12 @@ def pay_debt(expense_split_id: int, current_user: User, db: Session) -> PayDebtR
 
         db.flush()
         db.refresh(expense_split)
-        db.refresh(virtual_card)
+        db.refresh(card_balance)
 
         return PayDebtResponse(
             expense_split_id=expense_split.id,
             expense_split_status=expense_split.status,
-            virtual_card_balance=virtual_card.balance,
+            card_balance=card_balance.balance,
         )
 
     except StripeError as e:

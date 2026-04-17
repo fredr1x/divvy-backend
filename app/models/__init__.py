@@ -13,3 +13,5 @@ from app.models.group_media import GroupMedia
 from app.models.stripe_next_card import StripeNextCard
 from app.models.virtual_card import VirtualCard
 from app.models.stripe_transactions import StripeTransaction
+from app.models.card_balance import CardBalance
+from app.models.currency_rate import CurrencyRate
