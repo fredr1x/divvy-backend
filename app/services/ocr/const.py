@@ -3,10 +3,10 @@ import logging
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from anthropic import AsyncAnthropic
 from fastapi import APIRouter
-from ultralytics import YOLO
 
 from app.core.config import settings
 
@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class AppState:
-    yolo: YOLO | None
+    yolo: Any | None
     vlm: AsyncAnthropic
     detector_enabled: bool
 
@@ -24,8 +24,10 @@ def _model_path() -> str:
     return str((Path(__file__).resolve().parent / "detector.pt"))
 
 
-async def _load_detector() -> YOLO | None:
+async def _load_detector() -> Any | None:
     try:
+        from ultralytics import YOLO
+
         return await asyncio.to_thread(YOLO, _model_path())
     except Exception as exc:
         logger.warning(
