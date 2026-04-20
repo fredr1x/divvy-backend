@@ -1,4 +1,4 @@
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
@@ -39,3 +39,7 @@ def get_current_user(
         )
 
     return user
+
+
+def get_ip_address(request: Request) -> str:
+    return request.client.host
