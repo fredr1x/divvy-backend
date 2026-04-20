@@ -8,7 +8,8 @@ from app.schemas import GroupMediaRead
 from app.services.group.group_media_service import (
     get_all_group_media,
     get_group_media,
-    upload_expense_receipt,
+    upload_receipt as upload_receipt_service,
+    upload_photo as upload_photo_service,
 )
 
 router = APIRouter(prefix="/group-media", tags=["group media"])
@@ -40,9 +41,24 @@ def upload_receipt(
     current_user: User = Depends(get_current_user),
     files: list[UploadFile] = File(...),
 ):
-    return upload_expense_receipt(
+    return upload_receipt_service(
         group_id=group_id,
         expense_id=expense_id,
+        db=db,
+        current_user=current_user,
+        files=files,
+    )
+
+
+@router.post("/photo")
+def upload_photo(
+    group_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    files: list[UploadFile] = File(...),
+):
+    return upload_photo(
+        group_id=group_id,
         db=db,
         current_user=current_user,
         files=files,

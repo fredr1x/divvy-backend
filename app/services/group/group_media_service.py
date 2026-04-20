@@ -89,12 +89,32 @@ def validate_user_access(key: str, current_user_id: int, db: Session):
         raise HTTPException(status_code=404, detail="User has no access to this media")
 
 
-def upload_expense_receipt(
+def upload_photo(
+    group_id: int,
+    db: Session,
+    current_user: User,
+    files: list[UploadFile],
+):
+    return upload_media(group_id, db, current_user, files, MediaCategory.PHOTO)
+
+
+def upload_receipt(
     group_id: int,
     expense_id: int,
     db: Session,
     current_user: User,
     files: list[UploadFile],
+):
+    return upload_media(group_id, db, current_user, files, MediaCategory.RECEIPT, expense_id)
+
+
+def upload_media(
+    group_id: int,
+    db: Session,
+    current_user: User,
+    files: list[UploadFile],
+    media_category: MediaCategory,
+    expense_id: int = None,
 ):
     created_media = []
 
@@ -108,7 +128,7 @@ def upload_expense_receipt(
             uploaded_by=current_user.id,
             expense_id=expense_id,
             file_url=key,
-            category=MediaCategory.RECEIPT,
+            category=media_category,
         )
 
         minio_service.upload(f.file.read(), key, f.content_type)

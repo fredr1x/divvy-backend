@@ -1,14 +1,13 @@
 import logging
 
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
-from sqlalchemy.orm import Session
-
 from app.db.session import get_db
 from app.dependencies import get_current_user
 from app.models import User
-from app.services.group.group_media_service import upload_expense_receipt
+from app.services.group.group_media_service import upload_receipt
 from app.services.ocr.const import AppState, lifespan
 from app.services.ocr.extract_service import extract_items
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
+from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +49,7 @@ async def scan_receipt(
         HTTPException 400: If file upload or processing fails
     """
 
-    _ = upload_expense_receipt(
+    _ = upload_receipt(
         group_id=group_id,
         expense_id=expense_id,
         db=db,
