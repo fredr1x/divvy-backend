@@ -1,7 +1,7 @@
 from urllib.parse import urlencode
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import RedirectResponse
 from sqlalchemy.orm import Session
 
@@ -13,7 +13,7 @@ from app.schemas import (
     LogoutRequest,
     RefreshRequest,
     TokenPair,
-    UserCreate,
+    UserCreate, UserRead,
 )
 from app.services.auth.auth_service import (
     issue_token_pair,
@@ -27,6 +27,11 @@ from app.services.user.user_service import (
     get_user_by_google_sub,
 )
 
+from app.models.audit_logs import AuditLog
+from app.models.enums import ActionType, ActionStatus
+from app.dependencies import get_ip_address
+from app.models.user import User
+
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
@@ -35,7 +40,7 @@ GOOGLE_TOKENINFO_URL = "https://oauth2.googleapis.com/tokeninfo"
 
 
 @router.post("/register", response_model=TokenPair)
-def register(payload: UserCreate, db: Session = Depends(get_db)) -> TokenPair:
+def register(request: Request, payload: UserCreate, db: Session = Depends(get_db)) -> TokenPair:
     """
     Register a new user with email and password.
 
@@ -43,6 +48,7 @@ def register(payload: UserCreate, db: Session = Depends(get_db)) -> TokenPair:
     Returns a token pair (access and refresh tokens) for immediate authentication.
 
     Args:
+        request: Contains request info
         payload: User creation data containing email, password, first_name, last_name
         db: Database session
 
@@ -52,11 +58,23 @@ def register(payload: UserCreate, db: Session = Depends(get_db)) -> TokenPair:
     Raises:
         HTTPException 400: If email is already registered
     """
+    audit_log: AuditLog = AuditLog(
+        action_type=ActionType.CREATE,
+        ip_address=get_ip_address(request),
+        entity_name="USER",
+    )
 
     if get_user_by_email(db, payload.email.__str__()):
-        raise HTTPException(status_code=400, detail="Email already registered")
+        message="Email already registered"
+        audit_log.action_status=ActionStatus.FAILED
+        audit_log.message=message
 
-    user = create_user_local(
+        db.add(audit_log)
+        db.commit()
+
+        raise HTTPException(status_code=400, detail=message)
+
+    user: User = create_user_local(
         db,
         payload.email.__str__(),
         payload.password,
@@ -64,12 +82,22 @@ def register(payload: UserCreate, db: Session = Depends(get_db)) -> TokenPair:
         payload.last_name,
     )
 
+    user_read: UserRead = UserRead.model_validate(user)
+
+    audit_log.user_id=user.id
+    audit_log.new_values=user_read.model_dump(mode="json")
+    audit_log.action_status=ActionStatus.SUCCESS
+    audit_log.message=f"User created successfully, user_id: {user.id}, email: {user.email}"
+
+    db.add(audit_log)
+    db.commit()
+
     access_token, refresh_token = issue_token_pair(db, user)
     return TokenPair(access_token=access_token, refresh_token=refresh_token)
 
 
 @router.post("/login", response_model=TokenPair)
-def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenPair:
+def login(request: Request, payload: LoginRequest, db: Session = Depends(get_db)) -> TokenPair:
     """
     Register a new user with email and password.
 
@@ -77,6 +105,7 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenPair:
     Returns a token pair (access and refresh tokens) for immediate authentication.
 
     Args:
+        request: Contains request info
         payload: User creation data containing email, password, first_name, last_name
         db: Database session
 
@@ -88,18 +117,46 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)) -> TokenPair:
     """
     user = get_user_by_email(db, payload.email.__str__())
 
+    audit_log: AuditLog = AuditLog(
+        action_type=ActionType.LOGIN,
+        ip_address=get_ip_address(request),
+        entity_id=user.id,
+        entity_name="USER",
+    )
+
     if not user or not user.password:
-        raise HTTPException(status_code=400, detail="Invalid credentials")
+        message="Invalid credentials"
+        audit_log.action_status=ActionStatus.FAILED
+        audit_log.message=message
+
+        db.add(audit_log)
+        db.commit()
+
+        raise HTTPException(status_code=400, detail=message)
 
     if not verify_password(payload.password, user.password):
-        raise HTTPException(status_code=400, detail="Invalid credentials")
+        message = "Invalid credentials"
+        audit_log.action_status = ActionStatus.FAILED
+        audit_log.message = message
+
+        db.add(audit_log)
+        db.commit()
+
+        raise HTTPException(status_code=400, detail=message)
+
+    audit_log.user_id=user.id
+    audit_log.message="User login successful"
+    audit_log.action_status=ActionStatus.SUCCESS
+
+    db.add(audit_log)
+    db.commit()
 
     access_token, refresh_token = issue_token_pair(db, user)
     return TokenPair(access_token=access_token, refresh_token=refresh_token)
 
 
 @router.post("/refresh", response_model=TokenPair)
-def refresh_token(payload: RefreshRequest, db: Session = Depends(get_db)) -> TokenPair:
+def refresh_token(request: Request, payload: RefreshRequest, db: Session = Depends(get_db)) -> TokenPair:
     """
     Refresh an expired access token using a valid refresh token.
 
@@ -107,6 +164,7 @@ def refresh_token(payload: RefreshRequest, db: Session = Depends(get_db)) -> Tok
     Maintains session continuity without re-entering credentials.
 
     Args:
+        request: Contains request info
         payload: Contains the refresh token
         db: Database session
 
@@ -117,20 +175,42 @@ def refresh_token(payload: RefreshRequest, db: Session = Depends(get_db)) -> Tok
         HTTPException 401: If refresh token is invalid or expired
     """
     result = rotate_refresh_token(db, payload.refresh_token)
+
+    audit_log: AuditLog = AuditLog(
+        action_type=ActionType.REFRESH_TOKEN,
+        ip_address=get_ip_address(request),
+        entity_name="REFRESH_TOKEN, USER",
+    )
+
     if not result:
-        raise HTTPException(status_code=401, detail="Invalid refresh token")
+        message="Invalid refresh token"
+        audit_log.message=message
+        audit_log.action_status=ActionStatus.FAILED
+
+        db.add(audit_log)
+        db.commit()
+
+        raise HTTPException(status_code=401, detail=message)
     access_token, refresh_token = result
+
+    audit_log.action_status=ActionStatus.SUCCESS
+    audit_log.message="Token refreshed successfully"
+
+    db.add(audit_log)
+    db.commit()
+
     return TokenPair(access_token=access_token, refresh_token=refresh_token)
 
 
 @router.post("/logout")
-def logout(payload: LogoutRequest, db: Session = Depends(get_db)) -> dict[str, bool]:
+def logout(request: Request, payload: LogoutRequest, db: Session = Depends(get_db)) -> dict[str, bool]:
     """
     Revoke the user's refresh token and logout.
 
     Invalidates the provided refresh token, preventing further token rotations.
 
     Args:
+        request: Contains request info
         payload: Contains the refresh token to revoke
         db: Database session
 
@@ -138,11 +218,32 @@ def logout(payload: LogoutRequest, db: Session = Depends(get_db)) -> dict[str, b
         dict: Contains 'revoked' boolean indicating successful revocation
     """
     revoked = revoke_refresh_token(db, payload.refresh_token)
+
+    audit_log: AuditLog = AuditLog(
+        action_type=ActionType.LOGOUT,
+        ip_address=get_ip_address(request),
+        entity_name="REFRESH_TOKEN, USER",
+    )
+
+    if not revoked:
+        message="Failed to revoke refresh token"
+        audit_log.action_status=ActionStatus.FAILED
+        audit_log.message=message
+
+        db.add(audit_log)
+        db.commit()
+
+    audit_log.action_status=ActionStatus.SUCCESS
+    audit_log.message="User logged out successfully"
+
+    db.add(audit_log)
+    db.commit()
+
     return {"revoked": revoked}
 
 
 @router.get("/google/login")
-def google_login() -> RedirectResponse:
+def google_login(request: Request) -> RedirectResponse:
     """
     Initiate Google OAuth2 login flow.
 
@@ -196,17 +297,20 @@ def google_callback(
         },
         timeout=10.0,
     )
+
     if token_response.status_code != 200:
         raise HTTPException(status_code=400, detail="Google token exchange failed")
 
     token_data = token_response.json()
     id_token = token_data.get("id_token")
+
     if not id_token:
         raise HTTPException(status_code=400, detail="Google ID token missing")
 
     info_response = httpx.get(
         GOOGLE_TOKENINFO_URL, params={"id_token": id_token}, timeout=10.0
     )
+
     if info_response.status_code != 200:
         raise HTTPException(status_code=400, detail="Google token verification failed")
 

@@ -15,3 +15,4 @@ from app.models.virtual_card import VirtualCard
 from app.models.stripe_transactions import StripeTransaction
 from app.models.card_balance import CardBalance
 from app.models.currency_rate import CurrencyRate
+from app.models.audit_logs import AuditLog
