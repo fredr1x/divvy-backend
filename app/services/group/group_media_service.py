@@ -1,10 +1,12 @@
-from fastapi import HTTPException
+from fastapi import HTTPException, UploadFile
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import UserGroup
+from app.models import User, UserGroup
+from app.models.enums.media_category import MediaCategory
 from app.models.group_media import GroupMedia
 from app.schemas import GroupMediaCreate, GroupMediaRead
+from app.services.minio.minio_service import minio_service
 from app.services.user.user_group_service import is_member_of_group
 
 
@@ -85,3 +87,36 @@ def validate_user_access(key: str, current_user_id: int, db: Session):
 
     if not is_member_of_group(db, media.group_id, current_user_id):
         raise HTTPException(status_code=404, detail="User has no access to this media")
+
+
+def upload_expense_receipt(
+    group_id: int,
+    expense_id: int,
+    db: Session,
+    current_user: User,
+    files: list[UploadFile],
+):
+    created_media = []
+
+    for f in files:
+        key: str = minio_service.generate_object_key(
+            group_id, MediaCategory.RECEIPT.name, f.filename
+        )
+
+        payload = GroupMediaCreate(
+            group_id=group_id,
+            uploaded_by=current_user.id,
+            expense_id=expense_id,
+            file_url=key,
+            category=MediaCategory.RECEIPT,
+        )
+
+        minio_service.upload(f.file.read(), key, f.content_type)
+
+        created = create_group_media(
+            db,
+            payload,
+        )
+        created_media.append(created)
+
+    return {"items": created_media}

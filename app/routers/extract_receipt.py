@@ -1,7 +1,12 @@
 import logging
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
+from sqlalchemy.orm import Session
 
+from app.db.session import get_db
+from app.dependencies import get_current_user
+from app.models import User
+from app.services.group.group_media_service import upload_expense_receipt
 from app.services.ocr.const import AppState, lifespan
 from app.services.ocr.extract_service import extract_items
 
@@ -17,7 +22,12 @@ router = APIRouter(lifespan=lifespan, tags=["ocr"])
 
 @router.post("/scan-receipt")
 async def scan_receipt(
-    files: list[UploadFile] = File(...), state: AppState = Depends(get_models)
+    group_id: int,
+    expense_id: int | None = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+    files: list[UploadFile] = File(...),
+    state: AppState = Depends(get_models),
 ):
     """
     Scan and extract receipt items using OCR and AI.
@@ -39,6 +49,14 @@ async def scan_receipt(
     Raises:
         HTTPException 400: If file upload or processing fails
     """
+
+    _ = upload_expense_receipt(
+        group_id=group_id,
+        expense_id=expense_id,
+        db=db,
+        current_user=current_user,
+        files=files,
+    )
 
     if not files:
         logger.warning("No Files Provided")
