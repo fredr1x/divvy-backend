@@ -75,9 +75,19 @@ async def create_group_expense(
 
     db.add(group_expense)
     await db.flush()
+
     await create_expense_split(db, payload, group_expense)
     await create_items_from_list(db, group_expense.id, payload.expense_items)
-    await db.refresh(group_expense)
+
+    await db.commit()
+
+    group_expense = await db.scalar(select(GroupExpense)
+        .options(
+            selectinload(GroupExpense.splits),
+            selectinload(GroupExpense.items),
+        )
+        .where(GroupExpense.id == group_expense.id))
+
     return GroupExpenseRead.model_validate(group_expense)
 
 
@@ -100,13 +110,17 @@ async def update_group_expense(
         "exact_share_amount",
         "percentage_share_amount",
     }
+
     updates = payload.model_dump(exclude_unset=True, exclude=exclude_fields)
     for key, value in updates.items():
         setattr(group_expense, key, value)
 
     db.add(group_expense)
     await db.flush()
+
     await update_expense_split(db, group_expense, payload)
     await update_items_from_list(db, group_expense.id, payload.expense_items)
+
     await db.refresh(group_expense)
+
     return GroupExpenseRead.model_validate(group_expense)

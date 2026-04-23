@@ -1,29 +1,28 @@
 from datetime import datetime
 from decimal import Decimal
 
-from fastapi import HTTPException
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
-from stripe.error import StripeError
-
 from app.models import AuditLog, ExpenseSplit, GroupExpense
-from app.models.card_balance import CardBalance
 from app.models.enums import ActionStatus, ActionType, Currency, SplitStatus, Type
 from app.models.user import User
 from app.models.virtual_card import VirtualCard
-from app.schemas import PayDebtResponse
+from app.schemas import PayDebtResponse, CardBalanceRead
 from app.schemas.stripe import StripeCreateCardResponse
 from app.schemas.virtual_card import VirtualCardRead
 from app.services.audit.audit_logs_service import create_failed_audit_log
 from app.services.card.card_balance_service import (
     deposit_balance,
     get_card_balance_by_card_id_and_currency,
+    get_all_balances_by_card_id
 )
 from app.services.currency.currency_service import CurrencyService
 from app.services.expense.expense_split_service import get_expense_split_by_id
 from app.services.expense.group_expense_service import get_group_expense_by_id
 from app.services.stripe.stripe_service import StripeService
 from app.services.stripe.stripe_transaction_service import create_transaction
+from fastapi import HTTPException
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from stripe.error import StripeError
 
 
 async def get_virtual_card_by_user_id(
@@ -48,8 +47,10 @@ async def get_virtual_card_by_user_id(
     audit_log.entity_id = virtual_card.id
     audit_log.action_status = ActionStatus.SUCCESS
     audit_log.message = "Virtual card retrieved successfully"
+
     db.add(audit_log)
     await db.commit()
+
     return virtual_card
 
 
@@ -57,16 +58,15 @@ async def get_virtual_card_by_user(
     ip_address: str, db: AsyncSession, current_user: User
 ) -> VirtualCardRead:
     virtual_card = await get_virtual_card_by_user_id(ip_address, db, current_user.id)
-    card_balance: CardBalance = await get_card_balance_by_card_id_and_currency(
-        ip_address, db, virtual_card.id, Currency.USD
-    )
+
+    balances: list[CardBalanceRead] = await get_all_balances_by_card_id(db, virtual_card.id)
 
     return VirtualCardRead(
         id=virtual_card.id,
         stripe_customer_id=virtual_card.stripe_customer_id,
         card_number=virtual_card.card_number,
         card_last4=virtual_card.card_last4,
-        balance=card_balance.balance if card_balance else Decimal("0.0"),
+        balances=balances
     )
 
 

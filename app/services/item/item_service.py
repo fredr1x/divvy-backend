@@ -20,6 +20,9 @@ async def get_item_by_id(db: AsyncSession, id: int) -> Item:
 async def create_items_from_list(
     db: AsyncSession, group_expense_id: int, items: list[ItemCreate]
 ) -> None:
+    if not items:
+        return
+
     for item in items:
         item_to_save = Item(
             group_expense_id=group_expense_id,
