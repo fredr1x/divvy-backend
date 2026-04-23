@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
 from app.dependencies import get_current_user
@@ -13,9 +13,9 @@ router = APIRouter(prefix="/expense-split", tags=["expense split"])
 
 
 @router.get("/get-all/{group_id}")
-def get_all_by_group_id(
+async def get_all_by_group_id(
     group_id: int,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> AllExpensesByGroupAndUser:
     """
@@ -35,4 +35,4 @@ def get_all_by_group_id(
     Raises:
         HTTPException 404: If group not found
     """
-    return get_all_expenses_by_group_id_and_user_id(db, group_id, current_user.id)
+    return await get_all_expenses_by_group_id_and_user_id(db, group_id, current_user.id)

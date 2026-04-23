@@ -4,7 +4,7 @@ import requests
 from decimal import Decimal
 from fastapi import HTTPException
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.currency_rate import CurrencyRate
 from app.models.enums import Currency
@@ -39,7 +39,9 @@ class CurrencyService:
             raise HTTPException(status_code=500, detail=str(e))
 
     @staticmethod
-    def save_rates_to_db(db: Session, rates: dict, base_currency: Currency = Currency.USD):
+    async def save_rates_to_db(
+        db: AsyncSession, rates: dict, base_currency: Currency = Currency.USD
+    ):
         allowed_currencies = {c.value for c in Currency}
 
         for currency_str, rate in rates.items():
@@ -51,12 +53,12 @@ class CurrencyService:
 
             currency_enum = Currency(currency_str)
 
-            existing = db.execute(
+            existing = (await db.execute(
                 select(CurrencyRate).where(
                     CurrencyRate.currency == currency_enum,
                     CurrencyRate.base_currency == base_currency.value
                 )
-            ).scalar_one_or_none()
+            )).scalar_one_or_none()
 
             if existing:
                 existing.rate = Decimal(str(rate))
@@ -70,11 +72,11 @@ class CurrencyService:
                     )
                 )
 
-        db.commit()
+        await db.commit()
 
     @staticmethod
-    def get_rate_from_db(
-            db: Session,
+    async def get_rate_from_db(
+            db: AsyncSession,
             currency: Currency,
             base_currency: Currency = Currency.USD
     ) -> Decimal:
@@ -82,7 +84,7 @@ class CurrencyService:
         if currency == base_currency:
             return Decimal("1.0")
 
-        rate = db.scalar(
+        rate = await db.scalar(
             select(CurrencyRate.rate).where(
                 CurrencyRate.currency == currency,
                 CurrencyRate.base_currency == base_currency.value
@@ -91,9 +93,9 @@ class CurrencyService:
 
         if not rate:
             rates = CurrencyService.fetch_rates_from_api(base_currency)
-            CurrencyService.save_rates_to_db(db, rates, base_currency)
+            await CurrencyService.save_rates_to_db(db, rates, base_currency)
 
-            rate = db.scalar(
+            rate = await db.scalar(
                 select(CurrencyRate.rate).where(
                     CurrencyRate.currency == currency,
                     CurrencyRate.base_currency == base_currency.value
@@ -109,8 +111,8 @@ class CurrencyService:
         return rate
 
     @staticmethod
-    def convert_amount(
-            db: Session,
+    async def convert_amount(
+            db: AsyncSession,
             amount: Decimal,
             from_currency: Currency,
             to_currency: Currency
@@ -119,8 +121,8 @@ class CurrencyService:
         if from_currency == to_currency:
             return amount
 
-        rate_from = CurrencyService.get_rate_from_db(db, from_currency, Currency.USD)
-        rate_to = CurrencyService.get_rate_from_db(db, to_currency, Currency.USD)
+        rate_from = await CurrencyService.get_rate_from_db(db, from_currency, Currency.USD)
+        rate_to = await CurrencyService.get_rate_from_db(db, to_currency, Currency.USD)
 
         if from_currency == Currency.USD:
             converted = amount * rate_to
@@ -134,12 +136,12 @@ class CurrencyService:
         return converted.quantize(Decimal("0.01"))
 
     @staticmethod
-    def get_exchange_rate(
-            db: Session,
+    async def get_exchange_rate(
+            db: AsyncSession,
             from_currency: Currency,
             to_currency: Currency
     ) -> Decimal:
-        return CurrencyService.convert_amount(
+        return await CurrencyService.convert_amount(
             db=db,
             amount=Decimal("1.0"),
             from_currency=from_currency,

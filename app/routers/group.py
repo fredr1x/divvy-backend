@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
 from app.schemas.group import GroupCreate, GroupRead, GroupUpdate
@@ -20,7 +20,7 @@ router = APIRouter(prefix="/groups", tags=["groups"])
 
 
 @router.get("/{id}", response_model=GroupRead)
-def get_group_by_id(id: int, db: Session = Depends(get_db)) -> GroupRead:
+async def get_group_by_id(id: int, db: AsyncSession = Depends(get_db)) -> GroupRead:
     """
     Retrieve group details by ID.
 
@@ -36,11 +36,13 @@ def get_group_by_id(id: int, db: Session = Depends(get_db)) -> GroupRead:
     Raises:
         HTTPException 404: If group not found
     """
-    return get_group_by_id_service(db, id=id)
+    return await get_group_by_id_service(db, id=id)
 
 
 @router.post("/create-group", response_model=GroupRead)
-def create_group(payload: GroupCreate, db: Session = Depends(get_db)) -> GroupRead:
+async def create_group(
+    payload: GroupCreate, db: AsyncSession = Depends(get_db)
+) -> GroupRead:
     """
     Create a new expense group.
 
@@ -54,11 +56,13 @@ def create_group(payload: GroupCreate, db: Session = Depends(get_db)) -> GroupRe
     Returns:
         GroupRead: The newly created group
     """
-    return create_group_service(db, payload.name, payload.creator_id, payload.currency)
+    return await create_group_service(db, payload.name, payload.creator_id, payload.currency)
 
 
 @router.put("/{id}", response_model=GroupRead)
-def update_group(payload: GroupUpdate, db: Session = Depends(get_db)) -> GroupRead:
+async def update_group(
+    payload: GroupUpdate, db: AsyncSession = Depends(get_db)
+) -> GroupRead:
     """
     Update group information.
 
@@ -74,11 +78,13 @@ def update_group(payload: GroupUpdate, db: Session = Depends(get_db)) -> GroupRe
     Raises:
         HTTPException 404: If group not found
     """
-    return update_group_service(db, payload)
+    return await update_group_service(db, payload)
 
 
 @router.get("/invitation-link-by-group-id/{id}")
-def invitation_link_by_group_id(id: int, db: Session = Depends(get_db)) -> str:
+async def invitation_link_by_group_id(
+    id: int, db: AsyncSession = Depends(get_db)
+) -> str:
     """
     Generate or retrieve invitation link for a group.
 
@@ -95,4 +101,4 @@ def invitation_link_by_group_id(id: int, db: Session = Depends(get_db)) -> str:
     Raises:
         HTTPException 404: If group not found
     """
-    return get_invitation_link_by_group_id(db, id)
+    return await get_invitation_link_by_group_id(db, id)

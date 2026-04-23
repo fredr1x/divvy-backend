@@ -5,6 +5,7 @@ python-multipart==0.0.22
 SQLAlchemy==2.0.46
 alembic==1.18.3
 psycopg2-binary==2.9.11
+asyncpg==0.31.0
 
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4

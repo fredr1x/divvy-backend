@@ -3,7 +3,8 @@ from itertools import chain
 
 from fastapi import HTTPException
 from sqlalchemy import select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.models import ExpenseSplit, GroupExpense, UserGroup
 from app.models.enums import ShareType, SplitStatus, SplitType
@@ -17,8 +18,10 @@ from app.schemas.group_expense import GroupExpenseCreate, GroupExpenseUpdate
 from app.services.user.user_group_service import get_group_members
 
 
-def get_expense_split_by_id(db: Session, expense_split_id: int) -> ExpenseSplit:
-    expense_split: ExpenseSplit = db.scalar(
+async def get_expense_split_by_id(
+    db: AsyncSession, expense_split_id: int
+) -> ExpenseSplit:
+    expense_split: ExpenseSplit = await db.scalar(
         select(ExpenseSplit).where(ExpenseSplit.id == expense_split_id)
     )
 
@@ -28,15 +31,14 @@ def get_expense_split_by_id(db: Session, expense_split_id: int) -> ExpenseSplit:
     return expense_split
 
 
-def get_all_expenses_by_group_id_and_user_id(
-    db: Session, group_id: int, user_id: int
+async def get_all_expenses_by_group_id_and_user_id(
+    db: AsyncSession, group_id: int, user_id: int
 ) -> AllExpensesByGroupAndUser:
     validate = select(UserGroup).where(
         UserGroup.group_id == group_id, UserGroup.user_id == user_id
     )
 
-    user_group = db.scalar(validate)
-
+    user_group = await db.scalar(validate)
     if not user_group:
         raise HTTPException(
             status_code=403, detail="User is not a member of this group"
@@ -47,8 +49,7 @@ def get_all_expenses_by_group_id_and_user_id(
         .options(selectinload(GroupExpense.splits))
         .where(GroupExpense.group_id == group_id)
     )
-
-    group_expenses = db.scalars(find_all_group_expenses).all()
+    group_expenses = (await db.scalars(find_all_group_expenses)).all()
 
     owed_amount_details: list[OwedAmountDetail] = []
     receivable_amount_details: list[ReceivableAmountDetail] = []
@@ -73,7 +74,7 @@ def get_all_expenses_by_group_id_and_user_id(
                 )
                 total_receivable += abs(split.owed_amount)
 
-    result = AllExpensesByGroupAndUser(
+    return AllExpensesByGroupAndUser(
         group_id=group_id,
         user_id=user_id,
         total_owed_amount=total_owed,
@@ -81,13 +82,12 @@ def get_all_expenses_by_group_id_and_user_id(
         owed_amount_details=owed_amount_details,
         receivable_amount_details=receivable_amount_details,
     )
-    return result
 
 
-def create_expense_split(
-    db: Session, payload: GroupExpenseCreate, group_expense: GroupExpense
+async def create_expense_split(
+    db: AsyncSession, payload: GroupExpenseCreate, group_expense: GroupExpense
 ) -> None:
-    group_members = get_group_members(db, payload.group_id)
+    group_members = await get_group_members(db, payload.group_id)
     owed_map = build_owed_amount_map(
         group_members=group_members,
         payer_id=payload.payer_id,
@@ -98,15 +98,15 @@ def create_expense_split(
         exact_share_amount=payload.exact_share_amount,
         percentage_share_amount=payload.percentage_share_amount,
     )
-    persist_snapshot_splits(db, group_expense.id, payload.payer_id, owed_map)
+    await persist_snapshot_splits(db, group_expense.id, payload.payer_id, owed_map)
 
 
-def update_expense_split(
-    db: Session,
+async def update_expense_split(
+    db: AsyncSession,
     group_expense: GroupExpense,
     payload: GroupExpenseUpdate,
 ) -> None:
-    group_members: list[UserRead] = get_group_members(db, group_expense.group_id)
+    group_members: list[UserRead] = await get_group_members(db, group_expense.group_id)
     total_amount = normalize_amount(payload.total_amount)
 
     if total_amount <= 0:
@@ -115,11 +115,11 @@ def update_expense_split(
         )
 
     expense_splits = list(
-        db.scalars(
+        (await db.scalars(
             select(ExpenseSplit).where(
                 ExpenseSplit.group_expense_id == group_expense.id
             )
-        ).all()
+        )).all()
     )
 
     if expense_splits and all(
@@ -141,7 +141,7 @@ def update_expense_split(
         percentage_share_amount=payload.percentage_share_amount,
     )
 
-    persist_snapshot_splits(
+    await persist_snapshot_splits(
         db, group_expense.id, group_expense.payer_id, owed_map, expense_splits
     )
 
@@ -156,7 +156,6 @@ def build_owed_amount_map(
     exact_share_amount: dict[int, Decimal] | None,
     percentage_share_amount: dict[int, Decimal] | None,
 ) -> dict[int, Decimal]:
-
     validate_group_members(group_members, expense_members)
     if payer_id not in set(expense_members):
         raise HTTPException(
@@ -203,7 +202,6 @@ def calculate_member_shares(
     percentage_share_amount: dict[int, Decimal] | None,
     group_members: list[UserRead],
 ) -> dict[int, Decimal]:
-
     if share_type == ShareType.EQUAL:
         count = len(expense_members)
         each = normalize_amount(total_amount / count)
@@ -274,14 +272,13 @@ def calculate_member_shares(
         }
         remainder = total_amount - sum(shares.values(), Decimal("0.00"))
         shares[payer_id] = normalize_amount(shares[payer_id] + remainder)
-
         return shares
 
     raise HTTPException(status_code=400, detail="Unsupported share type")
 
 
-def persist_snapshot_splits(
-    db: Session,
+async def persist_snapshot_splits(
+    db: AsyncSession,
     group_expense_id: int,
     payer_id: int,
     owed_map: dict[int, Decimal],
@@ -289,18 +286,18 @@ def persist_snapshot_splits(
 ) -> None:
     if existing_splits is None:
         existing_splits = list(
-            db.scalars(
+            (await db.scalars(
                 select(ExpenseSplit).where(
                     ExpenseSplit.group_expense_id == group_expense_id
                 )
-            ).all()
+            )).all()
         )
 
     for split in existing_splits:
-        db.delete(split)
+        await db.delete(split)
 
     for user_id, owed_amount in owed_map.items():
-        build_expense(
+        await build_expense(
             db,
             user_id,
             group_expense_id,
@@ -310,8 +307,8 @@ def persist_snapshot_splits(
         )
 
 
-def build_expense(
-    db: Session,
+async def build_expense(
+    db: AsyncSession,
     member_id: int,
     group_expense_id: int,
     amount_for_each_member: Decimal,
@@ -319,7 +316,6 @@ def build_expense(
     payer: bool,
     refund_to_user_id: int | None = None,
 ) -> None:
-
     split = ExpenseSplit(
         user_id=member_id,
         group_expense_id=group_expense_id,
@@ -328,7 +324,6 @@ def build_expense(
         split_type=split_type,
         refund_to_user_id=refund_to_user_id,
     )
-
     db.add(split)
 
 

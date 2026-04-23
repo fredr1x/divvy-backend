@@ -1,13 +1,13 @@
 from decimal import Decimal
 
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import StripeTransaction
 from app.models.enums import Currency, Status, Type
 
 
-def create_transaction(
-    db: Session,
+async def create_transaction(
+    db: AsyncSession,
     card_id: int,
     stripe_payment_intent_id: str,
     stripe_charge_id: str,
@@ -33,5 +33,5 @@ def create_transaction(
     )
 
     db.add(stripe_transaction)
-    db.flush()
-    db.refresh(stripe_transaction)
+    await db.flush()
+    await db.refresh(stripe_transaction)
