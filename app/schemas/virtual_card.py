@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from app.schemas.card_balance import CardBalanceRead
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.enums import Currency, SplitStatus
@@ -10,7 +11,7 @@ class VirtualCardRead(BaseModel):
     stripe_customer_id: str
     card_number: str
     card_last4: str = Field(serialization_alias="card_last_4")
-    balance: Decimal
+    balances: list[CardBalanceRead]
 
     model_config = ConfigDict(from_attributes=True)
 

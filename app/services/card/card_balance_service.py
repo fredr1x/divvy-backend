@@ -7,9 +7,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import AuditLog, User, VirtualCard
 from app.models.card_balance import CardBalance
 from app.models.enums import ActionStatus, ActionType, Currency
-from app.schemas import CardBalanceConverted, CardBalanceOut
+from app.schemas import CardBalanceConverted, CardBalanceOut, CardBalanceRead
 from app.services.audit.audit_logs_service import create_failed_audit_log
 from app.services.currency.currency_service import CurrencyService
+
+
+async def get_all_balances_by_card_id(
+    db: AsyncSession,
+    card_id: int
+)-> list[CardBalanceRead]:
+    return list(await db.scalars(select(CardBalance).where(CardBalance.card_id == card_id)))
 
 
 async def get_card_balance_by_card_id_and_currency(

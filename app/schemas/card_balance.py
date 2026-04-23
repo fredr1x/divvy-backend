@@ -21,6 +21,13 @@ class CardBalanceOut(BaseModel):
     id: int
     card_id: int
     currency: Currency
-    card_balance: Decimal
+    balance: Decimal
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CardBalanceRead(BaseModel):
+    currency: Currency
+    balance: Decimal
 
     model_config = ConfigDict(from_attributes=True)

@@ -14,7 +14,7 @@ from app.models.user import User
 
 
 async def issue_token_pair(db: AsyncSession, user: User) -> tuple[str, str]:
-    access_token = create_access_token(str(user.id))
+    access_token = create_access_token(str(user.id), user.first_name, user.last_name, user.email)
     refresh_plain = new_refresh_token_plain()
     refresh = RefreshToken(
         user_id=user.id,
