@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
 from app.models import TestTable
@@ -13,30 +13,30 @@ router = APIRouter(prefix="/test-tables", tags=["test-tables"])
 
 
 @router.post("", response_model=TestTableRead)
-def create_test_table_endpoint(
+async def create_test_table_endpoint(
     payload: TestTableCreate,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> TestTable:
-    return create_test_table(db, payload)
+    return await create_test_table(db, payload)
 
 @router.get("", response_model=list[TestTableRead])
-def read_test_table_endpoint(
-        db: Session = Depends(get_db)
+async def read_test_table_endpoint(
+        db: AsyncSession = Depends(get_db)
 ) -> list[TestTable]:
-    return get_all_from_test_table(db)
+    return await get_all_from_test_table(db)
 
 @router.get("/{id}", response_model=TestTableRead)
-def read_test_table_endpoint(
+async def read_test_table_endpoint(
     id: int,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> TestTable:
-    record = get_test_table_by_id(db, id)
+    record = await get_test_table_by_id(db, id)
     if not record:
         raise HTTPException(status_code=404, detail="Not found")
     return record
 
 @router.delete("/{id}", status_code=204)
-def delete_test_table_endpoint(
+async def delete_test_table_endpoint(
         id: int,
-        db: Session = Depends(get_db)):
-    delete_test_by_id(db, id)
+        db: AsyncSession = Depends(get_db)):
+    await delete_test_by_id(db, id)

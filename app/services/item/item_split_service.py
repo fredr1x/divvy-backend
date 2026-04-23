@@ -1,16 +1,15 @@
 from decimal import ROUND_HALF_UP, Decimal
 
 from sqlalchemy import delete
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.item import Item
 from app.models.item_split import ItemSplit
 
 
-def create_item_splits(
-    db: Session, item_id: int, assigned_user_ids: list[int], item_total_price: Decimal
+async def create_item_splits(
+    db: AsyncSession, item_id: int, assigned_user_ids: list[int], item_total_price: Decimal
 ) -> None:
-
     count = len(assigned_user_ids)
     share = normalize_amount(item_total_price / count)
     remainder = item_total_price - (share * count)
@@ -20,14 +19,13 @@ def create_item_splits(
         db.add(ItemSplit(item_id=item_id, user_id=user_id, share_amount=share_amount))
 
 
-def update_item_splits(db: Session, item: Item, assigned_user_ids: list[int]) -> None:
-
+async def update_item_splits(db: AsyncSession, item: Item, assigned_user_ids: list[int]) -> None:
     splits = item.item_splits
     old_assigned_user_ids = [split.user_id for split in splits]
 
     removed_user_ids = set(old_assigned_user_ids) - set(assigned_user_ids)
     for id in removed_user_ids:
-        db.execute(
+        await db.execute(
             delete(ItemSplit).where(
                 ItemSplit.item_id == item.id, ItemSplit.user_id == id
             )
@@ -37,8 +35,8 @@ def update_item_splits(db: Session, item: Item, assigned_user_ids: list[int]) ->
     for new_id in new_assigned_user_ids:
         db.add(ItemSplit(item_id=item.id, user_id=new_id, share_amount=Decimal("0")))
 
-    db.flush()
-    db.refresh(item)
+    await db.flush()
+    await db.refresh(item)
     splits = item.item_splits
     splits.sort(key=lambda x: x.user_id)
 
@@ -49,7 +47,7 @@ def update_item_splits(db: Session, item: Item, assigned_user_ids: list[int]) ->
     for i, split in enumerate(splits):
         split.share_amount = share + remainder if i == 0 else share
 
-    db.flush()
+    await db.flush()
 
 
 def normalize_amount(value: Decimal | int | float) -> Decimal:

@@ -1,28 +1,29 @@
 from fastapi import HTTPException
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.test_table import TestTable
 from app.schemas.test_table import TestTableCreate
 
 
-def create_test_table(db: Session, data: TestTableCreate) -> TestTable:
+async def create_test_table(db: AsyncSession, data: TestTableCreate) -> TestTable:
     record = TestTable(text=data.text)
     db.add(record)
-    db.refresh(record)
+    await db.flush()
+    await db.refresh(record)
     return record
 
-def get_all_from_test_table(db: Session) -> list[TestTable]:
+async def get_all_from_test_table(db: AsyncSession) -> list[TestTable]:
     statement = select(TestTable)
-    return list(db.scalars(statement))
+    return list((await db.scalars(statement)).all())
 
-def get_test_table_by_id(db: Session, id: int) -> TestTable | None:
+async def get_test_table_by_id(db: AsyncSession, id: int) -> TestTable | None:
     statement = select(TestTable).where(TestTable.id == id)
-    return db.scalar(statement)
+    return await db.scalar(statement)
 
-def delete_test_by_id(db: Session, id: int) -> None:
-    test = db.get(TestTable, id)
+async def delete_test_by_id(db: AsyncSession, id: int) -> None:
+    test = await db.get(TestTable, id)
     if not test:
         raise HTTPException(status_code=404, detail="Test not found")
 
-    db.delete(test)
+    await db.delete(test)

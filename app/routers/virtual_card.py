@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, Request
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
 from app.dependencies import get_current_user, get_ip_address
@@ -32,54 +32,54 @@ router = APIRouter(prefix="/virtual-card", tags=["virtual-card"])
 
 
 @router.get("/")
-def get_virtual_card_by_user(
+async def get_virtual_card_by_user(
     request: Request,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_db)
 ) -> VirtualCardRead:
-    return get_virtual_card_by_user_service(get_ip_address(request), db, current_user)
+    return await get_virtual_card_by_user_service(get_ip_address(request), db, current_user)
 
 
 @router.post("/")
-def create_virtual_card(
+async def create_virtual_card(
     request: Request,
-    current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
 ) -> VirtualCardRead:
-    return create_virtual_card_service(get_ip_address(request), db, current_user)
+    return await create_virtual_card_service(get_ip_address(request), db, current_user)
 
 
 @router.post("/{card_id}/deposit")
-def deposit_virtual_card(
+async def deposit_virtual_card(
     request: Request,
     card_id: int,
     payload: VirtualCardDeposit,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> VirtualCardRead:
-    return deposit_virtual_card_service(
+    return await deposit_virtual_card_service(
         get_ip_address(request), db, current_user, card_id, payload.amount, payload.currency
     )
 
 
 @router.post("/{card_id}/pay-debt")
-def pay_debt(
+async def pay_debt(
     request: Request,
     payload: PayDebtRequest,
     current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> PayDebtResponse:
-    return pay_debt_service(get_ip_address(request), payload.expense_split_id, current_user, db)
+    return await pay_debt_service(get_ip_address(request), payload.expense_split_id, current_user, db)
 
 
 @router.post("/{card_id}/convert")
-def convert(
+async def convert(
     request: Request,
     card_id: int,
     payload: CardBalanceConvert,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 )-> CardBalanceConverted:
-    return convert_card_balance_service(
+    return await convert_card_balance_service(
         get_ip_address(request),
         db,
         current_user,

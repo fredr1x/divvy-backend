@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
 from app.dependencies import get_current_user
@@ -20,8 +20,8 @@ router = APIRouter(prefix="/user-groups", tags=["user group"])
 
 
 @router.get("/by-group-id/{id}")
-def get_group_members_by_group_id(
-    id: int, db: Session = Depends(get_db)
+async def get_group_members_by_group_id(
+    id: int, db: AsyncSession = Depends(get_db)
 ) -> list[UserRead]:
     """
     Retrieve all members of a group.
@@ -35,13 +35,13 @@ def get_group_members_by_group_id(
     Returns:
         list[UserRead]: List of users in the group
     """
-    return get_group_members(id, db)
+    return await get_group_members(db, id)
 
 
 @router.post("/invite-by-email", response_model=UserGroupRead)
-def invite_to_group_by_email(
+async def invite_to_group_by_email(
     payload: UserGroupAddMemberByEmail,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> UserGroupRead:
     """
@@ -59,13 +59,13 @@ def invite_to_group_by_email(
     Returns:
         UserGroupRead: The created user-group relationship
     """
-    return add_to_group_by_email_service(payload, db, current_user)
+    return await add_to_group_by_email_service(db, payload, current_user)
 
 
 @router.post("/invite/{link}")
-def join_by_invitation_link(
+async def join_by_invitation_link(
     link: str,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """
@@ -85,4 +85,4 @@ def join_by_invitation_link(
     Raises:
         HTTPException 400: If invitation link is invalid or expired
     """
-    return join_by_invitation_link_service(link, db, current_user)
+    return await join_by_invitation_link_service(db, link, current_user)

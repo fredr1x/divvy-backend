@@ -7,7 +7,7 @@ from app.services.group.group_media_service import upload_receipt
 from app.services.ocr.const import AppState, lifespan
 from app.services.ocr.extract_service import extract_items
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +23,7 @@ router = APIRouter(lifespan=lifespan, tags=["ocr"])
 async def scan_receipt(
     group_id: int,
     expense_id: int | None = None,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
     files: list[UploadFile] = File(...),
     state: AppState = Depends(get_models),
@@ -49,7 +49,7 @@ async def scan_receipt(
         HTTPException 400: If file upload or processing fails
     """
 
-    _ = upload_receipt(
+    _ = await upload_receipt(
         group_id=group_id,
         expense_id=expense_id,
         db=db,

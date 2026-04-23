@@ -1,6 +1,7 @@
 from fastapi import HTTPException
 from sqlalchemy import select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.models import GroupExpense
 from app.schemas.group_expense import (
@@ -12,16 +13,15 @@ from app.services.expense.expense_split_service import (
     create_expense_split,
     update_expense_split,
 )
-from app.services.item.item_service import (
-    create_items_from_list,
-    update_items_from_list,
-)
+from app.services.item.item_service import create_items_from_list, update_items_from_list
 from app.services.user.user_group_service import get_group_by_id, is_member_of_group
 from app.services.user.user_service import get_user_by_id
 
 
-def get_group_expense_by_id(db: Session, group_expense_id: int) -> GroupExpense:
-    group_expense: GroupExpense = db.scalar(
+async def get_group_expense_by_id(
+    db: AsyncSession, group_expense_id: int
+) -> GroupExpense:
+    group_expense: GroupExpense = await db.scalar(
         select(GroupExpense).where(GroupExpense.id == group_expense_id)
     )
 
@@ -30,30 +30,35 @@ def get_group_expense_by_id(db: Session, group_expense_id: int) -> GroupExpense:
     return group_expense
 
 
-def get_group_expense_by_group_id(db: Session, group_id: int) -> list[GroupExpenseRead]:
+async def get_group_expense_by_group_id(
+    db: AsyncSession, group_id: int
+) -> list[GroupExpenseRead]:
     stmt = (
         select(GroupExpense)
         .where(GroupExpense.group_id == group_id)
         .options(selectinload(GroupExpense.splits))
         .order_by(GroupExpense.created_at.desc())
     )
-
-    group_expenses = db.scalars(stmt).all()
+    group_expenses = (await db.scalars(stmt)).all()
     return [GroupExpenseRead.model_validate(exp) for exp in group_expenses]
 
 
-def create_group_expense(db: Session, payload: GroupExpenseCreate) -> GroupExpenseRead:
+async def create_group_expense(
+    db: AsyncSession, payload: GroupExpenseCreate
+) -> GroupExpenseRead:
+    group = await get_group_by_id(db, payload.group_id)
+    payer = await get_user_by_id(db, payload.payer_id)
+    creator = await get_user_by_id(db, payload.created_by)
 
-    group = get_group_by_id(db, payload.group_id)
-    payer = get_user_by_id(db, payload.payer_id)
-    creator = get_user_by_id(db, payload.created_by)
+    if not payer or not creator:
+        raise HTTPException(status_code=404, detail="User not found")
 
-    if not is_member_of_group(db, group.id, payer.id):
+    if not await is_member_of_group(db, group.id, payer.id):
         raise HTTPException(
             status_code=400, detail="Payer is not a member of this group"
         )
 
-    if not is_member_of_group(db, group.id, creator.id):
+    if not await is_member_of_group(db, group.id, creator.id):
         raise HTTPException(
             status_code=403, detail="Creator is not a member of this group"
         )
@@ -69,25 +74,24 @@ def create_group_expense(db: Session, payload: GroupExpenseCreate) -> GroupExpen
     )
 
     db.add(group_expense)
-    db.flush()
-    create_expense_split(db, payload, group_expense)
-    create_items_from_list(db, group_expense.id, payload.expense_items)
-    db.refresh(group_expense)
+    await db.flush()
+    await create_expense_split(db, payload, group_expense)
+    await create_items_from_list(db, group_expense.id, payload.expense_items)
+    await db.refresh(group_expense)
     return GroupExpenseRead.model_validate(group_expense)
 
 
-def update_group_expense(
-    db: Session, payload: GroupExpenseUpdate, current_user_id: int
+async def update_group_expense(
+    db: AsyncSession, payload: GroupExpenseUpdate, current_user_id: int
 ) -> GroupExpenseRead:
-
-    group_expense: GroupExpense = db.scalar(
+    group_expense: GroupExpense = await db.scalar(
         select(GroupExpense).where(GroupExpense.id == payload.id)
     )
 
     if not group_expense:
         raise HTTPException(status_code=404, detail="Group expense not found")
 
-    if not is_member_of_group(db, group_expense.group_id, current_user_id):
+    if not await is_member_of_group(db, group_expense.group_id, current_user_id):
         raise HTTPException(status_code=403, detail="You are not a member of the group")
 
     exclude_fields = {
@@ -101,9 +105,8 @@ def update_group_expense(
         setattr(group_expense, key, value)
 
     db.add(group_expense)
-    db.flush()
-
-    update_expense_split(db, group_expense, payload)
-    update_items_from_list(db, group_expense.id, payload.expense_items)
-    db.refresh(group_expense)
+    await db.flush()
+    await update_expense_split(db, group_expense, payload)
+    await update_items_from_list(db, group_expense.id, payload.expense_items)
+    await db.refresh(group_expense)
     return GroupExpenseRead.model_validate(group_expense)

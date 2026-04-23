@@ -9,6 +9,11 @@ services:
       POSTGRES_PASSWORD: divvy
     volumes:
       - divvy_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U divvy -d divvy-db"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
     networks:
       - divvy-network
 
@@ -39,8 +44,10 @@ services:
     env_file:
       - .env
     depends_on:
-      - divvy-db
-      - minio
+      divvy-db:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
     ports:
       - "8001:8001"
     volumes:

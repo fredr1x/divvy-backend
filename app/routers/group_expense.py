@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
 from app.dependencies import get_current_user
@@ -23,8 +23,8 @@ router = APIRouter(prefix="/group-expenses", tags=["group expenses"])
 
 
 @router.get("/{group_id}", status_code=200)
-def get_group_expenses(
-    group_id: int, db: Session = Depends(get_db)
+async def get_group_expenses(
+    group_id: int, db: AsyncSession = Depends(get_db)
 ) -> list[GroupExpenseRead]:
     """
     Retrieve all expenses for a specific group.
@@ -42,13 +42,13 @@ def get_group_expenses(
     Raises:
         HTTPException 404: If group not found
     """
-    return get_group_expense_service(group_id, db)
+    return await get_group_expense_service(db, group_id)
 
 
 @router.post("", status_code=201)
-def create_group_expense(
+async def create_group_expense(
     payload: GroupExpenseCreate,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
 ) -> GroupExpenseRead:
     """
     Create a new expense in a group.
@@ -62,13 +62,13 @@ def create_group_expense(
     Returns:
         GroupExpenseRead: The newly created expense
     """
-    return create_group_expense_service(db, payload)
+    return await create_group_expense_service(db, payload)
 
 
 @router.put("", status_code=200)
-def update_group_expense(
+async def update_group_expense(
     payload: GroupExpenseUpdate,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> GroupExpenseRead:
     """
@@ -89,4 +89,4 @@ def update_group_expense(
         HTTPException 403: If user lacks permission to update
         HTTPException 404: If expense not found
     """
-    return update_group_expense_service(db, payload, user.id)
+    return await update_group_expense_service(db, payload, user.id)

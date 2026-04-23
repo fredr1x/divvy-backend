@@ -2,7 +2,7 @@ from decimal import Decimal
 
 import stripe
 from fastapi import HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.models.enums import Currency
@@ -17,12 +17,12 @@ stripe.api_key = settings.STRIPE_SECRET_KEY
 
 class StripeService:
     @staticmethod
-    def create_customer_card(db: Session, email: str, name: str):
+    async def create_customer_card(db: AsyncSession, email: str, name: str):
         customer = stripe.Customer.create(
             email=email, name=name, description=f"Mock customer {name}"
         )
 
-        card_data = StripeTestCards.get_next_card(db)
+        card_data = await StripeTestCards.get_next_card(db)
         test_pm_id = StripeTestCards.get_test_token(card_data["brand"])
 
         try:
@@ -221,8 +221,8 @@ class StripeTestCards:
         return StripeTestCards.TEST_TOKENS.get(brand, "pm_card_visa")
 
     @staticmethod
-    def get_next_card(db: Session):
-        number: int = get_next_card_number(db)
+    async def get_next_card(db: AsyncSession):
+        number: int = await get_next_card_number(db)
 
         if number > 11:
             raise HTTPException(
@@ -230,5 +230,5 @@ class StripeTestCards:
             )
 
         card = StripeTestCards.CARDS[number]
-        update_next_card_number(db, number + 1)
+        await update_next_card_number(db, number + 1)
         return card

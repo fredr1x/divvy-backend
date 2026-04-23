@@ -2,12 +2,8 @@ from app.db.session import SessionLocal
 from app.models.enums import Currency
 from app.services.currency.currency_service import CurrencyService
 
-def update_currency_rates():
-    db = SessionLocal()
-
-    try:
+async def update_currency_rates():
+    async with SessionLocal() as db:
         rates = CurrencyService.fetch_rates_from_api(Currency.USD)
-        CurrencyService.save_rates_to_db(db, rates, Currency.USD)
-
-    finally:
-        db.close()
+        await CurrencyService.save_rates_to_db(db, rates, Currency.USD)
+        await db.commit()
