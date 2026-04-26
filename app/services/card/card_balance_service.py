@@ -80,11 +80,11 @@ async def deposit_balance(
     await db.flush()
     await db.refresh(card_balance)
 
-    audit_log.entity_id = card_balance.id
-    audit_log.old_values = old_values.model_dump(mode="json")
-    audit_log.new_values = new_values.model_dump(mode="json")
-    audit_log.message = f"Card balance updated successfully, balance: {card_balance.id}"
-    audit_log.action_status = ActionStatus.SUCCESS
+    audit_log.entity_id=card_balance.id
+    audit_log.old_values=[old_values.model_dump(mode="json")]
+    audit_log.new_values=[new_values.model_dump(mode="json")]
+    audit_log.message=f"Card balance updated successfully, balance: {card_balance.id}"
+    audit_log.action_status=ActionStatus.SUCCESS
 
     db.add(audit_log)
     await db.commit()
@@ -134,7 +134,12 @@ async def convert_card_balance(
     ).model_dump(mode="json")
 
     converted_amount: Decimal = await CurrencyService.convert_amount(
-        db, amount, from_currency, to_currency
+        current_user.id,
+        ip_address,
+        db,
+        amount,
+        from_currency,
+        to_currency
     )
     card_balance_from.balance -= amount
     audit_log_for_from_card.new_values = CardBalanceOut.model_validate(

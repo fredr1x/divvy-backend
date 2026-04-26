@@ -14,7 +14,6 @@ class GroupExpenseCreate(BaseModel):
     group_id: int
     name: str
     currency: Currency | None = None
-    created_by: int
     share_type: ShareType
     total_amount: Decimal
     expense_members: list[int]

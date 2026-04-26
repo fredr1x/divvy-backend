@@ -167,7 +167,12 @@ async def deposit_virtual_card(
     amount_usd = (
         amount
         if currency == Currency.USD
-        else await CurrencyService.convert_amount(db, amount, currency, Currency.USD)
+        else await CurrencyService.convert_amount(current_user.id,
+                                                  ip_address,
+                                                  db, amount,
+                                                  currency,
+                                                  Currency.USD
+                                                  )
     )
 
     if amount_usd < 0.50:
@@ -228,14 +233,22 @@ async def pay_debt(
         entity_name="EXPENSE_SPLIT",
     )
 
-    expense_split: ExpenseSplit = await get_expense_split_by_id(db, expense_split_id)
+    expense_split: ExpenseSplit = await get_expense_split_by_id(ip_address,
+                                                                db,
+                                                                current_user,
+                                                                expense_split_id
+                                                                )
+
     if expense_split.status == SplitStatus.PAID:
         message = "Expense split already paid"
         await create_failed_audit_log(db, audit_log, message)
         raise HTTPException(status_code=400, detail=message)
 
     group_expense: GroupExpense = await get_group_expense_by_id(
-        db, expense_split.group_expense_id
+            ip_address,
+        db,
+        current_user.id,
+        expense_split.group_expense_id
     )
 
     if expense_split.user_id != current_user.id:

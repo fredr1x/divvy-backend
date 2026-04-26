@@ -1,13 +1,15 @@
+from app.models.enums import ActionType, ActionStatus
 from fastapi import HTTPException, UploadFile
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import User, UserGroup
+from app.models import User, UserGroup, AuditLog
 from app.models.enums.media_category import MediaCategory
 from app.models.group_media import GroupMedia
 from app.schemas import GroupMediaCreate, GroupMediaRead
 from app.services.minio.minio_service import minio_service
 from app.services.user.user_group_service import is_member_of_group
+from app.services.audit.audit_logs_service import create_failed_audit_log
 
 
 async def find_by_id(media_id: int, db: AsyncSession) -> GroupMedia:
@@ -45,21 +47,36 @@ async def get_all_group_media(
     return [GroupMediaRead.model_validate(m) for m in group_media]
 
 
-async def create_group_media(db: AsyncSession, payload: GroupMediaCreate) -> GroupMediaRead:
+async def create_group_media(
+    ip_address: str,
+    db: AsyncSession,
+    payload: GroupMediaCreate,
+    current_user_id: int,
+) -> GroupMediaRead:
+
+    audit_log: AuditLog = AuditLog(
+        user_id=current_user_id,
+        action_type=ActionType.CREATE,
+        ip_address=ip_address,
+        entity_name="GROUP_MEDIA",
+    )
+
     group_id: int = payload.group_id
 
     user_group = await db.scalar(
         select(UserGroup).where(
-            UserGroup.group_id == group_id, UserGroup.user_id == payload.uploaded_by
+            UserGroup.group_id == group_id, UserGroup.user_id == current_user_id
         )
     )
 
     if not user_group:
-        raise HTTPException(status_code=400, detail="User is not a member of the group")
+        message="User is not a member of the group"
+        await create_failed_audit_log(db, audit_log, message)
+        raise HTTPException(status_code=400, detail=message)
 
     group_media = GroupMedia(
         group_id=group_id,
-        uploaded_by=payload.uploaded_by,
+        uploaded_by=current_user_id,
         expense_id=payload.expense_id,
         category=payload.category,
         file_url=payload.file_url,
@@ -68,7 +85,14 @@ async def create_group_media(db: AsyncSession, payload: GroupMediaCreate) -> Gro
 
     db.add(group_media)
     await db.flush()
-    await db.refresh(group_media)
+
+    audit_log.entity_id=group_media.id
+    audit_log.action_status=ActionStatus.SUCCESS
+    audit_log.message="Successfully created group media"
+
+    db.add(audit_log)
+    await db.commit()
+
     return GroupMediaRead.model_validate(group_media)
 
 
@@ -79,15 +103,23 @@ async def validate_user_access(key: str, current_user_id: int, db: AsyncSession)
 
 
 async def upload_photo(
+    ip_address: str,
     group_id: int,
     db: AsyncSession,
     current_user: User,
     files: list[UploadFile],
 ):
-    return await upload_media(group_id, db, current_user, files, MediaCategory.PHOTO)
+    return await upload_media(ip_address,
+                              group_id,
+                              db,
+                              current_user,
+                              files,
+                              MediaCategory.PHOTO
+                              )
 
 
 async def upload_receipt(
+    ip_address: str,
     group_id: int,
     expense_id: int | None,
     db: AsyncSession,
@@ -95,11 +127,18 @@ async def upload_receipt(
     files: list[UploadFile],
 ):
     return await upload_media(
-        group_id, db, current_user, files, MediaCategory.RECEIPT, expense_id
+        ip_address,
+        group_id,
+        db,
+        current_user,
+        files,
+        MediaCategory.RECEIPT,
+        expense_id
     )
 
 
 async def upload_media(
+    ip_address: str,
     group_id: int,
     db: AsyncSession,
     current_user: User,
@@ -108,20 +147,20 @@ async def upload_media(
     expense_id: int | None = None,
 ):
     created_media = []
-
     for f in files:
         key: str = minio_service.generate_object_key(group_id, media_category.name, f.filename)
 
         payload = GroupMediaCreate(
             group_id=group_id,
-            uploaded_by=current_user.id,
             expense_id=expense_id,
             file_url=key,
             category=media_category,
         )
 
         minio_service.upload(f.file.read(), key, f.content_type)
-        created = await create_group_media(db, payload)
+        created = await create_group_media(ip_address, db, payload, current_user.id)
         created_media.append(created)
+
+
 
     return {"items": created_media}

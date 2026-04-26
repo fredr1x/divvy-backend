@@ -37,11 +37,12 @@ class AuditLog(Base):
         nullable=False
     )
 
-    old_values: Mapped[dict] = mapped_column(
-        JSON, nullable=True
+    old_values: Mapped[list[dict]] = mapped_column(
+        JSON,
+        nullable=True
     )
 
-    new_values: Mapped[dict] = mapped_column(
+    new_values: Mapped[list[dict]] = mapped_column(
         JSON,
         nullable=True
     )

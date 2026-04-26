@@ -6,43 +6,75 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models import ExpenseSplit, GroupExpense, UserGroup
-from app.models.enums import ShareType, SplitStatus, SplitType
+from app.models import ExpenseSplit, GroupExpense, UserGroup, User, AuditLog
+from app.models.enums import ShareType, SplitStatus, SplitType, ActionType, ActionStatus
 from app.schemas import ItemCreate, ItemUpdate, UserRead
 from app.schemas.expense_split import (
     AllExpensesByGroupAndUser,
     OwedAmountDetail,
-    ReceivableAmountDetail,
+    ReceivableAmountDetail, ExpenseSplitDetails,
 )
 from app.schemas.group_expense import GroupExpenseCreate, GroupExpenseUpdate
 from app.services.user.user_group_service import get_group_members
+from app.services.audit.audit_logs_service import create_failed_audit_log
 
 
 async def get_expense_split_by_id(
-    db: AsyncSession, expense_split_id: int
+    ip_address: str,
+    db: AsyncSession,
+    current_user: User,
+    expense_split_id: int
 ) -> ExpenseSplit:
+
+    audit_log: AuditLog = AuditLog(
+        user_id=current_user.id,
+        action_type=ActionType.READ,
+        ip_address=ip_address,
+        entity_name="EXPENSE_SPLIT",
+    )
+
     expense_split: ExpenseSplit = await db.scalar(
         select(ExpenseSplit).where(ExpenseSplit.id == expense_split_id)
     )
 
     if not expense_split:
-        raise HTTPException(status_code=404, detail="Expense split not found")
+        message="Expense split not found"
+        await create_failed_audit_log(db, audit_log, message)
+
+        raise HTTPException(status_code=404, detail=message)
+
+    audit_log.entity_id=expense_split.id
+    audit_log.message="Successfully retrieved expense split"
+    audit_log.action_status=ActionStatus.SUCCESS
+
+    db.add(audit_log)
+    await db.commit()
 
     return expense_split
 
 
 async def get_all_expenses_by_group_id_and_user_id(
-    db: AsyncSession, group_id: int, user_id: int
+    ip_address: str,
+    db: AsyncSession,
+    group_id: int,
+    user_id: int,
 ) -> AllExpensesByGroupAndUser:
     validate = select(UserGroup).where(
         UserGroup.group_id == group_id, UserGroup.user_id == user_id
     )
 
+    audit_log: AuditLog = AuditLog(
+        user_id=user_id,
+        action_type=ActionType.READ,
+        ip_address=ip_address,
+        entity_name="EXPENSE_SPLIT",
+    )
+
     user_group = await db.scalar(validate)
     if not user_group:
-        raise HTTPException(
-            status_code=403, detail="User is not a member of this group"
-        )
+        message=f"User is not a member of the group {group_id}"
+        await create_failed_audit_log(db, audit_log, message)
+        raise HTTPException(status_code=403, detail=message)
 
     find_all_group_expenses = (
         select(GroupExpense)
@@ -74,6 +106,12 @@ async def get_all_expenses_by_group_id_and_user_id(
                 )
                 total_receivable += abs(split.owed_amount)
 
+    audit_log.message="Successfully retrieved expense split details"
+    audit_log.action_status=ActionStatus.SUCCESS
+
+    db.add(audit_log)
+    await db.commit()
+
     return AllExpensesByGroupAndUser(
         group_id=group_id,
         user_id=user_id,
@@ -85,9 +123,14 @@ async def get_all_expenses_by_group_id_and_user_id(
 
 
 async def create_expense_split(
-    db: AsyncSession, payload: GroupExpenseCreate, group_expense: GroupExpense
+    ip_address: str,
+    db: AsyncSession,
+    payload: GroupExpenseCreate,
+    group_expense: GroupExpense,
+    current_user: User,
 ) -> None:
     group_members = await get_group_members(db, payload.group_id)
+
     owed_map = build_owed_amount_map(
         group_members=group_members,
         payer_id=payload.payer_id,
@@ -98,13 +141,23 @@ async def create_expense_split(
         exact_share_amount=payload.exact_share_amount,
         percentage_share_amount=payload.percentage_share_amount,
     )
-    await persist_snapshot_splits(db, group_expense.id, payload.payer_id, owed_map)
+
+    await persist_snapshot_splits(ip_address,
+                                  db,
+                                  group_expense.id,
+                                  payload.payer_id,
+                                  owed_map,
+                                  current_user.id,
+                                  ActionType.CREATE,
+                                  )
 
 
 async def update_expense_split(
+    ip_address: str,
     db: AsyncSession,
     group_expense: GroupExpense,
     payload: GroupExpenseUpdate,
+    current_user_id: int,
 ) -> None:
     group_members: list[UserRead] = await get_group_members(db, group_expense.group_id)
     total_amount = normalize_amount(payload.total_amount)
@@ -142,7 +195,14 @@ async def update_expense_split(
     )
 
     await persist_snapshot_splits(
-        db, group_expense.id, group_expense.payer_id, owed_map, expense_splits
+        ip_address,
+        db,
+        group_expense.id,
+        group_expense.payer_id,
+        owed_map,
+        current_user_id,
+        ActionType.UPDATE,
+        expense_splits,
     )
 
 
@@ -278,12 +338,23 @@ def calculate_member_shares(
 
 
 async def persist_snapshot_splits(
+    ip_address: str,
     db: AsyncSession,
     group_expense_id: int,
     payer_id: int,
     owed_map: dict[int, Decimal],
+    current_user_id: int,
+    action_type: ActionType,
     existing_splits: list[ExpenseSplit] | None = None,
 ) -> None:
+
+    audit_log: AuditLog = AuditLog(
+        user_id=current_user_id,
+        action_type=action_type,
+        ip_address=ip_address,
+        entity_name="EXPENSE_SPLIT",
+    )
+
     if existing_splits is None:
         existing_splits = list(
             (await db.scalars(
@@ -293,30 +364,42 @@ async def persist_snapshot_splits(
             )).all()
         )
 
+    old_values_list = []
     for split in existing_splits:
+        old_values_list.append(ExpenseSplitDetails.model_validate(split).model_dump(mode="json"))
         await db.delete(split)
 
+    audit_log.old_values=old_values_list
+
+    new_values_list = []
     for user_id, owed_amount in owed_map.items():
-        await build_expense(
-            db,
-            user_id,
-            group_expense_id,
-            owed_amount,
-            SplitType.ORIGINAL,
-            user_id == payer_id,
-        )
+        expense_split = build_expense(user_id,
+                                      group_expense_id,
+                                      owed_amount,
+                                      SplitType.ORIGINAL,
+                                      user_id == payer_id,
+                                      )
+        db.add(expense_split)
+        await db.flush()
+        new_values_list.append(ExpenseSplitDetails.model_validate(expense_split).model_dump(mode="json"))
+
+    audit_log.new_values=new_values_list
+
+    audit_log.message=f"Successfully {action_type.name.lower()}d expense splits of group_expense {group_expense_id}"
+    audit_log.action_status=ActionStatus.SUCCESS
+    db.add(audit_log)
+    await db.commit()
 
 
 async def build_expense(
-    db: AsyncSession,
     member_id: int,
     group_expense_id: int,
     amount_for_each_member: Decimal,
     split_type: SplitType,
     payer: bool,
     refund_to_user_id: int | None = None,
-) -> None:
-    split = ExpenseSplit(
+) -> ExpenseSplit:
+    return ExpenseSplit(
         user_id=member_id,
         group_expense_id=group_expense_id,
         owed_amount=amount_for_each_member,
@@ -324,7 +407,7 @@ async def build_expense(
         split_type=split_type,
         refund_to_user_id=refund_to_user_id,
     )
-    db.add(split)
+
 
 
 def normalize_amount(value: Decimal | int | float) -> Decimal:

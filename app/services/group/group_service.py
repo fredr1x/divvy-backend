@@ -1,18 +1,40 @@
 import uuid
 
+from app.models.enums import ActionType, ActionStatus
 from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Group, User, UserGroup
+from app.models import Group, User, UserGroup, AuditLog
 from app.models.enums.currency import Currency
 from app.models.enums.group_role import GroupRole
 from app.schemas.group import GroupRead, GroupUpdate
+from app.services.audit.audit_logs_service import create_failed_audit_log
 
 
 async def create_group(
-    db: AsyncSession, name: str, creator_id: int, currency: Currency
+    ip_address: str,
+    db: AsyncSession,
+    name: str,
+    creator_id: int,
+    currency: Currency,
+    current_user: User,
 ) -> GroupRead:
+
+    audit_log: AuditLog = AuditLog(
+        user_id=current_user.id,
+        action_type=ActionType.CREATE,
+        ip_address=ip_address,
+        entity_name="GROUP",
+    )
+
+    group_exists = await db.scalar(select(Group).where(Group.creator_id == creator_id).where(Group.name == name))
+
+    if group_exists:
+        message=f"Group with name {name} already exists"
+        await create_failed_audit_log(db, audit_log, message)
+        raise HTTPException(status_code=400, detail=message)
+
     group = Group(
         name=name,
         creator_id=creator_id,
@@ -20,29 +42,50 @@ async def create_group(
         invitation_link=generate_invitation_link(),
     )
 
-    statement = (
-        select(Group).where(Group.creator_id == creator_id).where(Group.name == name)
-    )
-    group_exists = await db.scalar(statement)
-
-    if group_exists:
-        raise HTTPException(
-            status_code=400, detail=f"Group with name {name} already exists"
-        )
-
     db.add(group)
     await db.flush()
+
+    audit_log.entity_id=group.id
+    audit_log.message="Successfully created group"
+    audit_log.action_status=ActionStatus.SUCCESS
+
+    db.add(audit_log)
+    await db.commit()
+
     await add_creator_to_user_group(db, group.id, creator_id)
     await db.refresh(group)
     return GroupRead.model_validate(group)
 
 
-async def get_group_by_id(db: AsyncSession, id: int) -> GroupRead:
-    statement = select(Group).where(Group.id == id)
-    group = await db.scalar(statement)
+async def get_group_by_id(
+    ip_address: str,
+    db: AsyncSession,
+    id: int,
+    current_user: User,
+) -> GroupRead:
+
+    audit_log: AuditLog = AuditLog(
+        user_id=current_user.id,
+        action_type=ActionType.READ,
+        ip_address=ip_address,
+        entity_name="GROUP",
+    )
+
+    group = await db.scalar(select(Group)
+        .join(UserGroup, UserGroup.group_id == Group.id)
+        .where(UserGroup.user_id == current_user.id, UserGroup.group_id == id))
 
     if not group:
-        raise HTTPException(status_code=404, detail="Group not found")
+        message="Group not found"
+        await create_failed_audit_log(db, audit_log, message)
+        raise HTTPException(status_code=404, detail=message)
+
+    audit_log.entity_id=group.id
+    audit_log.message="Successfully retrieved group"
+    audit_log.action_status=ActionStatus.SUCCESS
+
+    db.add(audit_log)
+    await db.commit()
 
     return group
 
@@ -56,26 +99,77 @@ async def get_groups_by_user(db: AsyncSession, user: User) -> list[GroupRead]:
     return list((await db.scalars(statement)).all())
 
 
-async def get_invitation_link_by_group_id(db: AsyncSession, id: int) -> str:
-    statement = select(Group).where(Group.id == id)
-    group = await db.scalar(statement)
+async def get_invitation_link_by_group_id(
+    ip_address: str,
+    db: AsyncSession,
+    id: int,
+    current_user: User,
+) -> str:
+
+    audit_log: AuditLog = AuditLog(
+        user_id=current_user.id,
+        action_type=ActionType.READ,
+        ip_address=ip_address,
+        entity_name="GROUP",
+    )
+
+    group = await db.scalar(select(Group)
+                            .join(UserGroup, UserGroup.group_id == Group.id)
+                            .where(UserGroup.user_id == current_user.id, UserGroup.group_id == id))
 
     if not group:
-        raise HTTPException(status_code=404, detail=f"Group with id {id} not found")
+        message = "Group not found"
+        await create_failed_audit_log(db, audit_log, message)
+        raise HTTPException(status_code=404, detail=message)
+
+    audit_log.entity_id=group.id
+    audit_log.message="Successfully retrieved group invitation link"
+    audit_log.action_status=ActionStatus.SUCCESS
+
+    db.add(audit_log)
+    await db.commit()
 
     return group.invitation_link
 
 
-async def update_group(db: AsyncSession, group_update: GroupUpdate) -> GroupRead:
-    statement = select(Group).where(Group.id == group_update.id)
-    group = await db.scalar(statement)
+async def update_group(
+    ip_address: str,
+    db: AsyncSession,
+    group_id: int,
+    group_update: GroupUpdate,
+    current_user: User,
+) -> GroupRead:
+
+    audit_log: AuditLog = AuditLog(
+        user_id=current_user.id,
+        action_type=ActionType.UPDATE,
+        ip_address=ip_address,
+        entity_name="GROUP",
+    )
+
+    group = await db.scalar(select(Group)
+                            .join(UserGroup, UserGroup.group_id == Group.id)
+                            .where(UserGroup.user_id == current_user.id, UserGroup.group_id == group_id))
 
     if not group:
-        raise HTTPException(status_code=404, detail="Group not found")
+        message="Group not found"
+        await create_failed_audit_log(db, audit_log, message)
+        raise HTTPException(status_code=404, detail=message)
+
+    audit_log.old_values=[GroupRead.model_validate(group).model_dump(mode="json")]
 
     group.name = group_update.name
     group.currency = group_update.currency
-    await db.refresh(group)
+    await db.flush()
+
+    audit_log.new_values=[GroupRead.model_validate(group).model_dump(mode="json")]
+    audit_log.entity_id=group.id
+    audit_log.action_status=ActionStatus.SUCCESS
+    audit_log.message="Group updated successfully"
+
+    db.add(audit_log)
+    await db.commit()
+
     return group
 
 
