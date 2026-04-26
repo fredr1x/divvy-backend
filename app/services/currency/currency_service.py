@@ -2,12 +2,14 @@ import os
 import requests
 
 from decimal import Decimal
+
+from app.models import AuditLog
 from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.currency_rate import CurrencyRate
-from app.models.enums import Currency
+from app.models.enums import Currency, ActionType, ActionStatus
 
 exchange_rate_api = os.getenv("EXCHANGE_RATE_API")
 
@@ -112,11 +114,20 @@ class CurrencyService:
 
     @staticmethod
     async def convert_amount(
+            current_user_id: int,
+            ip_address: str,
             db: AsyncSession,
             amount: Decimal,
             from_currency: Currency,
             to_currency: Currency
     ) -> Decimal:
+
+        audit_log: AuditLog = AuditLog(
+            user_id=current_user_id,
+            action_type=ActionType.READ,
+            ip_address=ip_address,
+            entity_name="CURRENCY_RATE",
+        )
 
         if from_currency == to_currency:
             return amount
@@ -133,15 +144,25 @@ class CurrencyService:
         else:
             converted = amount * (rate_to / rate_from)
 
+        audit_log.message=f"Successfully converted amount from {from_currency.name} to {to_currency.name}"
+        audit_log.action_status=ActionStatus.SUCCESS
+
+        db.add(audit_log)
+        await db.commit()
+
         return converted.quantize(Decimal("0.01"))
 
     @staticmethod
     async def get_exchange_rate(
+            current_user_id: int,
+            ip_address: str,
             db: AsyncSession,
             from_currency: Currency,
             to_currency: Currency
     ) -> Decimal:
         return await CurrencyService.convert_amount(
+            current_user_id=current_user_id,
+            ip_address=ip_address,
             db=db,
             amount=Decimal("1.0"),
             from_currency=from_currency,

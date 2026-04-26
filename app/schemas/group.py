@@ -6,7 +6,6 @@ from app.models.enums.currency import Currency
 
 
 class GroupUpdate(BaseModel):
-    id: int
     name: str
     currency: Currency
 

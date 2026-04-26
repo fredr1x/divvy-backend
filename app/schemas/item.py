@@ -1,7 +1,17 @@
 from decimal import Decimal
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
+
+
+class ItemRead(BaseModel):
+    name: str
+    group_expense_id: int
+    price: Decimal
+    quantity: int
+    total_price: Decimal
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ItemCreate(BaseModel):

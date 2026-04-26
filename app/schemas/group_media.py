@@ -8,7 +8,6 @@ from app.models.enums.media_category import MediaCategory
 
 class GroupMediaCreate(BaseModel):
     group_id: int
-    uploaded_by: int
     expense_id: Optional[int] = None
     file_url: str
     category: MediaCategory

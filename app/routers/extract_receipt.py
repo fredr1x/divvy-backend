@@ -1,7 +1,7 @@
 import logging
 
 from app.db.session import get_db
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, get_ip_address
 from app.models import User
 from app.services.group.group_media_service import upload_receipt
 from app.services.ocr.const import AppState, lifespan
@@ -21,6 +21,7 @@ router = APIRouter(lifespan=lifespan, tags=["ocr"])
 
 @router.post("/scan-receipt")
 async def scan_receipt(
+    request: Request,
     group_id: int,
     expense_id: int | None = None,
     db: AsyncSession = Depends(get_db),
@@ -50,6 +51,7 @@ async def scan_receipt(
     """
 
     _ = await upload_receipt(
+        ip_address=get_ip_address(request),
         group_id=group_id,
         expense_id=expense_id,
         db=db,
