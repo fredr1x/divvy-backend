@@ -1,4 +1,4 @@
-from app.dependencies import get_current_user, get_ip_address
+from app.dependencies import get_current_verified_user, get_ip_address
 from app.models import User
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -26,7 +26,7 @@ async def get_group_by_id(
     request: Request,
     id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_verified_user),
 ) -> GroupRead:
     """
     Retrieve group details by ID.
@@ -53,7 +53,7 @@ async def create_group(
     request: Request,
     payload: GroupCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_verified_user),
 ) -> GroupRead:
     """
     Create a new expense group.
@@ -85,7 +85,7 @@ async def update_group(
     id: int,
     payload: GroupUpdate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_verified_user),
 ) -> GroupRead:
     """
     Update group information.
@@ -115,7 +115,7 @@ async def invitation_link_by_group_id(
     request: Request,
     id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_verified_user),
 ) -> str:
     """
     Generate or retrieve invitation link for a group.

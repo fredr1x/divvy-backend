@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
-from app.dependencies import get_current_user
+from app.dependencies import get_current_verified_user
 from app.models.user import User
 from app.schemas import AllExpensesByGroupAndUser
 from app.services.expense.expense_split_service import (
@@ -19,7 +19,7 @@ async def get_all_by_group_id(
     request: Request,
     group_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_verified_user),
 ) -> AllExpensesByGroupAndUser:
     """
     Retrieve all expenses and splits for a group from current user's perspective.

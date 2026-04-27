@@ -73,7 +73,7 @@ async def invite_to_group_by_email(
 
     user_group_to_save = UserGroup(group_id=group_id, user_id=user_to_add.id, group_role=GroupRole.MEMBER, is_active=False)
 
-    send_invite_email(email, group.name, group.invitation_link)
+    await send_invite_email(email, group.name, group.invitation_link)
 
     db.add(user_group_to_save)
     await db.flush()

@@ -3,6 +3,7 @@ import uuid
 from app.models.enums import ActionType, ActionStatus
 from fastapi import HTTPException
 from sqlalchemy import select
+from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Group, User, UserGroup, AuditLog
@@ -35,6 +36,11 @@ async def create_group(
         await create_failed_audit_log(db, audit_log, message)
         raise HTTPException(status_code=400, detail=message)
 
+    if len(name) > 255:
+        message="Group name must be at most 255 characters"
+        await create_failed_audit_log(db, audit_log, message)
+        raise HTTPException(status_code=422, detail=message)
+
     group = Group(
         name=name,
         creator_id=creator_id,
@@ -43,7 +49,15 @@ async def create_group(
     )
 
     db.add(group)
-    await db.flush()
+    try:
+        await db.flush()
+    except DBAPIError as exc:
+        await db.rollback()
+        if _is_varchar_limit_error(exc):
+            message="Group name must be at most 255 characters"
+            await create_failed_audit_log(db, audit_log, message)
+            raise HTTPException(status_code=422, detail=message) from exc
+        raise
 
     audit_log.entity_id=group.id
     audit_log.message="Successfully created group"
@@ -160,7 +174,20 @@ async def update_group(
 
     group.name = group_update.name
     group.currency = group_update.currency
-    await db.flush()
+    if len(group.name) > 255:
+        message = "Group name must be at most 255 characters"
+        await create_failed_audit_log(db, audit_log, message)
+        raise HTTPException(status_code=422, detail=message)
+
+    try:
+        await db.flush()
+    except DBAPIError as exc:
+        await db.rollback()
+        if _is_varchar_limit_error(exc):
+            message = "Group name must be at most 255 characters"
+            await create_failed_audit_log(db, audit_log, message)
+            raise HTTPException(status_code=422, detail=message)
+        raise
 
     audit_log.new_values=[GroupRead.model_validate(group).model_dump(mode="json")]
     audit_log.entity_id=group.id
@@ -187,3 +214,7 @@ async def add_creator_to_user_group(
     )
 
     db.add(user_group)
+
+
+def _is_varchar_limit_error(exc: DBAPIError) -> bool:
+    return "value too long for type character varying(255)" in str(exc).lower()

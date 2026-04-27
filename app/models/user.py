@@ -34,6 +34,8 @@ class User(Base):
 
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
+    is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
     auth_provider: Mapped[str] = mapped_column(
         String(32), default="local", nullable=False
     )

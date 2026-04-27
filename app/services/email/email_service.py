@@ -7,9 +7,19 @@ email_from = settings.GOOGLE_EMAIL_FROM
 password = settings.GOOGLE_EMAIL_PASSWORD
 
 
-def send_invite_email(to, group_name, invite_link):
+async def send_invite_email(to, group_name, invite_link):
     msg = MIMEText(invite_email_template(group_name, invite_link), "html")
     msg["Subject"] = "You've been invited to a group"
+    await send_email(msg, to)
+
+
+async def send_verification_email(to, link):
+    msg = MIMEText(verification_email_template(link), "html")
+    msg["Subject"] = "Email verification"
+    await send_email(msg, to)
+
+
+async def send_email(msg: MIMEText, to):
     msg["From"] = email_from
     msg["To"] = to
 
@@ -53,4 +63,16 @@ def invite_email_template(group_name: str, invite_link: str) -> str:
       </div>
     </body>
     </html>
+    """
+
+def verification_email_template(link: str) -> str:
+    return f"""
+    <!DOCTYPE html>
+    <html>
+    <body>
+        <h1>Verify your email</h1>
+        <p>Please click this <a href="{link}">link</a> to verify your email</p>
+    </body>
+    </html>
+    
     """

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
-from app.dependencies import get_current_user
+from app.dependencies import get_current_verified_user
 from app.models.user import User
 from app.schemas.user import UserRead
 from app.schemas.user_group import UserGroupAddMemberByEmail, UserGroupRead
@@ -42,7 +42,7 @@ async def get_group_members_by_group_id(
 async def invite_to_group_by_email(
     payload: UserGroupAddMemberByEmail,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_verified_user),
 ) -> UserGroupRead:
     """
     Invite a user to group by email address.
@@ -66,7 +66,7 @@ async def invite_to_group_by_email(
 async def join_by_invitation_link(
     link: str,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_verified_user),
 ):
     """
     Join a group using an invitation link.

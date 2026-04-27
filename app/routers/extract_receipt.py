@@ -1,7 +1,7 @@
 import logging
 
 from app.db.session import get_db
-from app.dependencies import get_current_user, get_ip_address
+from app.dependencies import get_current_verified_user, get_ip_address
 from app.models import User
 from app.services.group.group_media_service import upload_receipt
 from app.services.ocr.const import AppState, lifespan
@@ -25,7 +25,7 @@ async def scan_receipt(
     group_id: int,
     expense_id: int | None = None,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_verified_user),
     files: list[UploadFile] = File(...),
     state: AppState = Depends(get_models),
 ):

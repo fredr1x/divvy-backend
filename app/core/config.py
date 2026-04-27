@@ -33,5 +33,7 @@ class Settings(BaseSettings):
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = False
 
+    DOMAIN: str | None = "localhost:8001"
+
 
 settings = Settings()

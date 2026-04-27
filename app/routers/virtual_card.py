@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
-from app.dependencies import get_current_user, get_ip_address
+from app.dependencies import get_current_verified_user, get_ip_address
 from app.models.user import User
 from app.schemas import (
     PayDebtRequest,
@@ -34,7 +34,7 @@ router = APIRouter(prefix="/virtual-card", tags=["virtual-card"])
 @router.get("/")
 async def get_virtual_card_by_user(
     request: Request,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_verified_user),
     db: AsyncSession = Depends(get_db)
 ) -> VirtualCardRead:
     return await get_virtual_card_by_user_service(get_ip_address(request), db, current_user)
@@ -43,7 +43,7 @@ async def get_virtual_card_by_user(
 @router.post("/")
 async def create_virtual_card(
     request: Request,
-    current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)
+    current_user: User = Depends(get_current_verified_user), db: AsyncSession = Depends(get_db)
 ) -> VirtualCardRead:
     return await create_virtual_card_service(get_ip_address(request), db, current_user)
 
@@ -53,7 +53,7 @@ async def deposit_virtual_card(
     request: Request,
     card_id: int,
     payload: VirtualCardDeposit,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_verified_user),
     db: AsyncSession = Depends(get_db),
 ) -> VirtualCardRead:
     return await deposit_virtual_card_service(
@@ -65,7 +65,7 @@ async def deposit_virtual_card(
 async def pay_debt(
     request: Request,
     payload: PayDebtRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_verified_user),
     db: AsyncSession = Depends(get_db),
 ) -> PayDebtResponse:
     return await pay_debt_service(get_ip_address(request), payload.expense_split_id, current_user, db)
@@ -77,7 +77,7 @@ async def convert(
     card_id: int,
     payload: CardBalanceConvert,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_verified_user),
 )-> CardBalanceConverted:
     return await convert_card_balance_service(
         get_ip_address(request),
