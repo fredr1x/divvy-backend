@@ -50,6 +50,24 @@ async def register(
     background_tasks: BackgroundTasks,
     db: AsyncSession = Depends(get_db),
 ) -> TokenPair:
+    """
+    Register a new user with email and password.
+
+    Creates a local user account, sends a verification email in the background,
+    and issues a token pair upon successful registration.
+
+    Args:
+        request: The incoming HTTP request (used for IP address logging)
+        payload: Registration data including email, password, first and last name
+        background_tasks: FastAPI background task runner for sending verification email
+        db: Database session
+
+    Returns:
+        TokenPair: Access and refresh tokens for the newly created user
+
+    Raises:
+        HTTPException 400: If the email is already registered
+    """
     audit_log = AuditLog(
         action_type=ActionType.CREATE,
         ip_address=get_ip_address(request),
@@ -97,6 +115,23 @@ async def register(
 
 @router.get("/verify/{token}")
 async def verify_user_email(token: str, db: AsyncSession = Depends(get_db)):
+    """
+    Verify a user's email address via a URL-safe token.
+
+    Decodes the token from the verification link sent to the user's email,
+    finds the corresponding user, and marks their account as verified.
+
+    Args:
+        token: URL-safe encoded token containing the user's email
+        db: Database session
+
+    Returns:
+        HTMLResponse 200: Confirmation page with a link to the app if verification succeeds
+        HTMLResponse 400: Failure page if the token does not contain a valid email
+
+    Raises:
+        HTTPException 404: If no user is found for the email in the token
+    """
     token_data = decode_url_safe_token(token)
     email = token_data.get("email")
 
@@ -133,6 +168,23 @@ async def verify_user_email(token: str, db: AsyncSession = Depends(get_db)):
 async def login(
     request: Request, payload: LoginRequest, db: AsyncSession = Depends(get_db)
 ) -> TokenPair:
+    """
+    Authenticate a user with email and password.
+
+    Validates the provided credentials against the stored password hash
+    and issues a new token pair on success. All attempts are audit-logged.
+
+    Args:
+        request: The incoming HTTP request (used for IP address logging)
+        payload: Login data containing email and password
+        db: Database session
+
+    Returns:
+        TokenPair: Access and refresh tokens for the authenticated user
+
+    Raises:
+        HTTPException 400: If credentials are invalid or the user does not exist
+    """
     user = await get_user_by_email(db, payload.email.__str__())
     audit_log = AuditLog(
         action_type=ActionType.LOGIN,
@@ -167,6 +219,23 @@ async def login(
 async def refresh_token(
     request: Request, payload: RefreshRequest, db: AsyncSession = Depends(get_db)
 ) -> TokenPair:
+    """
+    Rotate a refresh token and issue a new token pair.
+
+    Validates the provided refresh token, invalidates it, and returns a
+    freshly issued access and refresh token pair (token rotation).
+
+    Args:
+        request: The incoming HTTP request (used for IP address logging)
+        payload: Request body containing the current refresh token
+        db: Database session
+
+    Returns:
+        TokenPair: New access and refresh tokens
+
+    Raises:
+        HTTPException 401: If the refresh token is invalid or already revoked
+    """
     result = await rotate_refresh_token(db, payload.refresh_token)
     audit_log = AuditLog(
         action_type=ActionType.REFRESH_TOKEN,
@@ -194,6 +263,20 @@ async def refresh_token(
 async def logout(
     request: Request, payload: LogoutRequest, db: AsyncSession = Depends(get_db)
 ) -> dict[str, bool]:
+    """
+    Log out a user by revoking their refresh token.
+
+    Marks the provided refresh token as revoked in the database so it
+    can no longer be used to obtain new access tokens.
+
+    Args:
+        request: The incoming HTTP request (used for IP address logging)
+        payload: Request body containing the refresh token to revoke
+        db: Database session
+
+    Returns:
+        dict[str, bool]: {"revoked": True} on success, {"revoked": False} on failure
+    """
     revoked = await revoke_refresh_token(db, payload.refresh_token)
     audit_log = AuditLog(
         action_type=ActionType.LOGOUT,
@@ -218,6 +301,15 @@ async def logout(
 
 @router.get("/google/login")
 async def google_login() -> RedirectResponse:
+    """
+    Initiate the Google OAuth2 authorization flow.
+
+    Builds the Google authorization URL with the required scopes and
+    parameters, then redirects the user to Google's consent screen.
+
+    Returns:
+        RedirectResponse: Redirect to Google's OAuth2 authorization endpoint
+    """
     params = {
         "client_id": settings.GOOGLE_CLIENT_ID,
         "redirect_uri": settings.GOOGLE_REDIRECT_URI,
@@ -235,6 +327,25 @@ async def google_callback(
     code: str = Query(...),
     db: AsyncSession = Depends(get_db),
 ) -> TokenPair:
+    """
+    Handle the Google OAuth2 callback and authenticate the user.
+
+    Exchanges the authorization code for tokens, verifies the ID token
+    with Google, and either retrieves an existing user, links the Google
+    account to an existing email, or creates a new user. Issues a token pair
+    upon completion.
+
+    Args:
+        code: Authorization code returned by Google after user consent
+        db: Database session
+
+    Returns:
+        TokenPair: Access and refresh tokens for the authenticated user
+
+    Raises:
+        HTTPException 400: If the token exchange fails, the ID token is missing or invalid,
+                           the Google audience does not match, or the profile is incomplete
+    """
     async with httpx.AsyncClient(timeout=10.0) as client:
         token_response = await client.post(
             GOOGLE_TOKEN_URL,
