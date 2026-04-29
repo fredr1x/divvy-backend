@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
-from app.dependencies import get_current_user, get_ip_address
+from app.dependencies import get_current_verified_user, get_ip_address
 from app.models import User
 from app.schemas import (
     GroupExpenseCreate,
@@ -28,7 +28,7 @@ async def get_group_expenses(
     request: Request,
     group_id: int,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_verified_user)
 ) -> list[GroupExpenseRead]:
     """
     Retrieve all expenses for a specific group.
@@ -54,7 +54,7 @@ async def create_group_expense(
     request: Request,
     payload: GroupExpenseCreate,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_verified_user),
 ) -> GroupExpenseRead:
     """
     Create a new expense in a group.
@@ -76,7 +76,7 @@ async def update_group_expense(
     request: Request,
     payload: GroupExpenseUpdate,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(get_current_user),
+    user: User = Depends(get_current_verified_user),
 ) -> GroupExpenseRead:
     """
     Update an existing expense.

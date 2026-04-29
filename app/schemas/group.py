@@ -1,17 +1,20 @@
 from datetime import datetime
+from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.enums.currency import Currency
 
+GroupName = Annotated[str, Field(min_length=1)]
+
 
 class GroupUpdate(BaseModel):
-    name: str
+    name: GroupName
     currency: Currency
 
 
 class GroupCreate(BaseModel):
-    name: str
+    name: GroupName
     creator_id: int
     currency: Currency
 

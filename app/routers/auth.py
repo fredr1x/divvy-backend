@@ -1,10 +1,6 @@
 from urllib.parse import urlencode
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from fastapi.responses import RedirectResponse
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.core.config import settings
 from app.core.security import verify_password
 from app.db.session import get_db
@@ -25,12 +21,19 @@ from app.services.auth.auth_service import (
     revoke_refresh_token,
     rotate_refresh_token,
 )
+from app.services.email.email_service import (send_verification_email)
+from app.services.email.utils import (create_url_safe_token, decode_url_safe_token)
 from app.services.user.user_service import (
     create_google_user,
     create_user_local,
     get_user_by_email,
     get_user_by_google_sub,
+    set_verified_to_user
 )
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, BackgroundTasks
+from fastapi.responses import RedirectResponse
+from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.responses import JSONResponse, HTMLResponse
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -41,7 +44,10 @@ GOOGLE_TOKENINFO_URL = "https://oauth2.googleapis.com/tokeninfo"
 
 @router.post("/register", response_model=TokenPair)
 async def register(
-    request: Request, payload: UserCreate, db: AsyncSession = Depends(get_db)
+    request: Request,
+    payload: UserCreate,
+    background_tasks: BackgroundTasks,
+    db: AsyncSession = Depends(get_db)
 ) -> TokenPair:
     audit_log = AuditLog(
         action_type=ActionType.CREATE,
@@ -67,16 +73,60 @@ async def register(
     )
     user_read = UserRead.model_validate(user)
 
-    audit_log.user_id = user.id
-    audit_log.new_values = user_read.model_dump(mode="json")
-    audit_log.action_status = ActionStatus.SUCCESS
-    audit_log.message = f"User created successfully, user_id: {user.id}, email: {user.email}"
+    audit_log.user_id=user.id
+    audit_log.entity_id=user.id
+    audit_log.new_values=user_read.model_dump(mode="json")
+    audit_log.action_status=ActionStatus.SUCCESS
+    audit_log.message=f"User created successfully, user_id: {user.id}, email: {user.email}"
     db.add(audit_log)
     await db.commit()
+
+    token = create_url_safe_token({"email": user.email})
+    background_tasks.add_task(
+        send_verification_email,
+        user.email,
+        f"http://{settings.BACKEND_DOMAIN}/auth/verify/{token}"
+    )
 
     access_token, refresh_token = await issue_token_pair(db, user)
     return TokenPair(access_token=access_token, refresh_token=refresh_token)
 
+
+@router.get("/verify/{token}")
+async def verify_user_email(
+    token: str,
+    db: AsyncSession = Depends(get_db)
+):
+    token_data = decode_url_safe_token(token)
+    email = token_data.get("email")
+
+    if email:
+        user = await get_user_by_email(db, email)
+
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        await set_verified_to_user(db, user)
+
+        # TODO change to redirect response
+        return HTMLResponse(
+            content=f"""
+            <html>
+              <body>
+                <h2>Account verified successfully</h2>
+                <a href="{settings.FRONTEND_DOMAIN}">Go to app</a>
+              </body>
+            </html>
+            """,
+            status_code=200,
+        )
+
+    return HTMLResponse(
+        content="""
+        <html><body><h2>Verification failed</h2></body></html>
+        """,
+        status_code=400,
+    )
 
 @router.post("/login", response_model=TokenPair)
 async def login(

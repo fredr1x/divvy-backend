@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.security import decode_token
 from app.db.session import get_db
+from app.exceptions.exceptions import AccountNotVerified
 from app.models.user import User
 from app.services.user.user_service import get_user_by_id
 
@@ -39,6 +40,14 @@ async def get_current_user(
         )
 
     return user
+
+
+async def get_current_verified_user(
+    current_user: User = Depends(get_current_user),
+) -> User:
+    if not current_user.is_verified:
+        raise AccountNotVerified()
+    return current_user
 
 
 def get_ip_address(request: Request) -> str:

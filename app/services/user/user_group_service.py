@@ -1,4 +1,4 @@
-from fastapi import HTTPException
+from fastapi import HTTPException, BackgroundTasks
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -38,7 +38,8 @@ async def get_group_members(
 async def invite_to_group_by_email(
     db: AsyncSession,
     payload: UserGroupAddMemberByEmail,
-    current_user: User
+    current_user: User,
+    background_tasks: BackgroundTasks,
 ) -> UserGroupRead:
 
     email = payload.email
@@ -73,7 +74,7 @@ async def invite_to_group_by_email(
 
     user_group_to_save = UserGroup(group_id=group_id, user_id=user_to_add.id, group_role=GroupRole.MEMBER, is_active=False)
 
-    send_invite_email(email, group.name, group.invitation_link)
+    background_tasks.add_task(send_invite_email,email, group.name, group.invitation_link)
 
     db.add(user_group_to_save)
     await db.flush()

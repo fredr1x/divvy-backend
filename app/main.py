@@ -6,6 +6,7 @@ from fastapi import FastAPI
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from zoneinfo import ZoneInfo
 
+from app.exceptions.exceptions import register_all_errors
 from app.jobs.currency_rates_job import update_currency_rates
 
 from app.routers import (
@@ -55,6 +56,8 @@ async def lifespan(app: FastAPI):
         scheduler.shutdown(wait=False)
 
 app = FastAPI(title="Divvy API", lifespan=lifespan)
+
+register_all_errors(app)
 
 app.include_router(auth_router)
 

@@ -56,3 +56,12 @@ async def create_google_user(
     await db.flush()
     await db.refresh(user)
     return user
+
+
+async def set_verified_to_user(
+    db: AsyncSession,
+    user: User,
+):
+    user.is_verified=True
+    await db.flush()
+    await db.refresh(user)
