@@ -1,6 +1,11 @@
 from urllib.parse import urlencode
 
 import httpx
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request
+from fastapi.responses import RedirectResponse
+from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.responses import HTMLResponse
+
 from app.core.config import settings
 from app.core.security import verify_password
 from app.db.session import get_db
@@ -21,19 +26,15 @@ from app.services.auth.auth_service import (
     revoke_refresh_token,
     rotate_refresh_token,
 )
-from app.services.email.email_service import (send_verification_email)
-from app.services.email.utils import (create_url_safe_token, decode_url_safe_token)
+from app.services.email.email_service import send_verification_email
+from app.services.email.utils import create_url_safe_token, decode_url_safe_token
 from app.services.user.user_service import (
     create_google_user,
     create_user_local,
     get_user_by_email,
     get_user_by_google_sub,
-    set_verified_to_user
+    set_verified_to_user,
 )
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, BackgroundTasks
-from fastapi.responses import RedirectResponse
-from sqlalchemy.ext.asyncio import AsyncSession
-from starlette.responses import JSONResponse, HTMLResponse
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -47,7 +48,7 @@ async def register(
     request: Request,
     payload: UserCreate,
     background_tasks: BackgroundTasks,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
 ) -> TokenPair:
     audit_log = AuditLog(
         action_type=ActionType.CREATE,
@@ -73,11 +74,13 @@ async def register(
     )
     user_read = UserRead.model_validate(user)
 
-    audit_log.user_id=user.id
-    audit_log.entity_id=user.id
-    audit_log.new_values=user_read.model_dump(mode="json")
-    audit_log.action_status=ActionStatus.SUCCESS
-    audit_log.message=f"User created successfully, user_id: {user.id}, email: {user.email}"
+    audit_log.user_id = user.id
+    audit_log.entity_id = user.id
+    audit_log.new_values = user_read.model_dump(mode="json")
+    audit_log.action_status = ActionStatus.SUCCESS
+    audit_log.message = (
+        f"User created successfully, user_id: {user.id}, email: {user.email}"
+    )
     db.add(audit_log)
     await db.commit()
 
@@ -85,7 +88,7 @@ async def register(
     background_tasks.add_task(
         send_verification_email,
         user.email,
-        f"http://{settings.BACKEND_DOMAIN}/auth/verify/{token}"
+        f"http://{settings.BACKEND_DOMAIN}/auth/verify/{token}",
     )
 
     access_token, refresh_token = await issue_token_pair(db, user)
@@ -93,10 +96,7 @@ async def register(
 
 
 @router.get("/verify/{token}")
-async def verify_user_email(
-    token: str,
-    db: AsyncSession = Depends(get_db)
-):
+async def verify_user_email(token: str, db: AsyncSession = Depends(get_db)):
     token_data = decode_url_safe_token(token)
     email = token_data.get("email")
 
@@ -128,6 +128,7 @@ async def verify_user_email(
         status_code=400,
     )
 
+
 @router.post("/login", response_model=TokenPair)
 async def login(
     request: Request, payload: LoginRequest, db: AsyncSession = Depends(get_db)
@@ -139,7 +140,11 @@ async def login(
         entity_name="USER",
     )
 
-    if not user or not user.password or not verify_password(payload.password, user.password):
+    if (
+        not user
+        or not user.password
+        or not verify_password(payload.password, user.password)
+    ):
         message = "Invalid credentials"
         audit_log.action_status = ActionStatus.FAILED
         audit_log.message = message

@@ -9,6 +9,7 @@ class ActionType(str, Enum):
     REFRESH_TOKEN = "REFRESH_TOKEN"
     LOGOUT = "LOGOUT"
     REGISTER = "REGISTER"
+    EXTRACT = "EXTRACT"
 
 
 class ActionStatus(str, Enum):

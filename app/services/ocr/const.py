@@ -60,8 +60,9 @@ async def lifespan(router: APIRouter):
 
     await vlm_client.close()
 
+
 def filter(receipt: list):
-    
+
     to_remove_price_none = []
     for i, item in enumerate(receipt["items"]):
         if item["price"] is None:

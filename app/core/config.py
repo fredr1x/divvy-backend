@@ -28,6 +28,8 @@ class Settings(BaseSettings):
     STRIPE_SECRET_KEY: str | None = None
 
     CLAUDE_API_KEY: str | None = None
+    CLAUDE_MODEL_ID: str | None = None
+    CLAUDE_MAX_TOKENS: int | None = None
 
     APP_NAME: str = "Divvy API"
     APP_VERSION: str = "1.0.0"

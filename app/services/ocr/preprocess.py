@@ -25,10 +25,26 @@ async def preprocess_receipt(state: AppState, img_bytes) -> str:
     return b64
 
 
-def _crop_receipt(img: np.ndarray, results) -> np.ndarray:
+async def _crop_receipt(img: np.ndarray, results) -> np.ndarray:
     if not results or len(results[0].boxes) == 0:
         return img
 
     box = results[0].boxes.xyxy[0].cpu().numpy().astype(np.uint16)
     x1, y1, x2, y2 = box
     return img[y1:y2, x1:x2]
+
+
+async def clean_and_merge(receipts: list[dict]):
+
+    merged: dict = receipts[0]
+    for r in receipts[1:]:
+        merged["items"].extend(r.get("items", []))
+
+    to_remove = [
+        i for i in range(len(merged["items"])) if not merged["items"][i]["price"]
+    ]
+
+    for i in sorted(to_remove, reverse=True):
+        merged["items"].pop(i)
+
+    return merged

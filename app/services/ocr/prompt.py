@@ -1,5 +1,5 @@
 SYSTEM_PROMPT = """
-You are a receipt parsing engine. Extract every purchased line-item from the receipt image.
+You are a receipt parsing engine. Extract every purchased line-item from the receipt image. Do not parse total of the receipt/bill.
 
 <field_rules>
   <item_name>

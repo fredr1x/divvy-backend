@@ -1,15 +1,11 @@
-import logging
+from fastapi import APIRouter, Depends, File, Request, UploadFile
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
 from app.dependencies import get_current_verified_user, get_ip_address
 from app.models import User
-from app.services.group.group_media_service import upload_receipt
 from app.services.ocr.const import AppState, lifespan
 from app.services.ocr.extract_service import extract_items
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
-from sqlalchemy.ext.asyncio import AsyncSession
-
-logger = logging.getLogger(__name__)
 
 
 def get_models(request: Request) -> AppState:
@@ -50,25 +46,14 @@ async def scan_receipt(
         HTTPException 400: If file upload or processing fails
     """
 
-    _ = await upload_receipt(
+    result = await extract_items(
         ip_address=get_ip_address(request),
         group_id=group_id,
         expense_id=expense_id,
         db=db,
         current_user=current_user,
         files=files,
+        state=state,
     )
-
-    if not files:
-        logger.warning("No Files Provided")
-        raise HTTPException(422, "No files provided")
-
-    if len(files) > 20:
-        logger.error(
-            "Too much images in one request (Claude's maximum is 20 per request)"
-        )
-        raise HTTPException(400, "Number of images per request exceeded 20")
-
-    result = await extract_items(files, state)
 
     return result
