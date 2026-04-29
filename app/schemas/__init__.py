@@ -3,8 +3,6 @@ from app.schemas.auth import (
     LogoutRequest,
     RefreshRequest,
     TokenPair,
-    AccountVerified,
-    AccountVerificationFailed
 )
 from app.schemas.test_table import TestTableCreate, TestTableRead
 from app.schemas.user import UserCreate, UserRead

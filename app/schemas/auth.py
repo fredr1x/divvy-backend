@@ -18,11 +18,3 @@ class RefreshRequest(BaseModel):
 
 class LogoutRequest(BaseModel):
     refresh_token: str
-
-
-class AccountVerified(BaseModel):
-    message: str
-
-
-class AccountVerificationFailed(BaseModel):
-    message: str

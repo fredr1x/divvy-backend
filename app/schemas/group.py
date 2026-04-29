@@ -5,7 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.enums.currency import Currency
 
-GroupName = Annotated[str, Field(min_length=1, max_length=255)]
+GroupName = Annotated[str, Field(min_length=1)]
 
 
 class GroupUpdate(BaseModel):

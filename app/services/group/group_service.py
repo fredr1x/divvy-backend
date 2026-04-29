@@ -39,7 +39,7 @@ async def create_group(
     if len(name) > 255:
         message="Group name must be at most 255 characters"
         await create_failed_audit_log(db, audit_log, message)
-        raise HTTPException(status_code=422, detail=message)
+        raise HTTPException(status_code=400, detail=message)
 
     group = Group(
         name=name,
@@ -56,7 +56,7 @@ async def create_group(
         if _is_varchar_limit_error(exc):
             message="Group name must be at most 255 characters"
             await create_failed_audit_log(db, audit_log, message)
-            raise HTTPException(status_code=422, detail=message) from exc
+            raise HTTPException(status_code=400, detail=message) from exc
         raise
 
     audit_log.entity_id=group.id
@@ -177,7 +177,7 @@ async def update_group(
     if len(group.name) > 255:
         message = "Group name must be at most 255 characters"
         await create_failed_audit_log(db, audit_log, message)
-        raise HTTPException(status_code=422, detail=message)
+        raise HTTPException(status_code=400, detail=message)
 
     try:
         await db.flush()
@@ -186,7 +186,7 @@ async def update_group(
         if _is_varchar_limit_error(exc):
             message = "Group name must be at most 255 characters"
             await create_failed_audit_log(db, audit_log, message)
-            raise HTTPException(status_code=422, detail=message)
+            raise HTTPException(status_code=400, detail=message)
         raise
 
     audit_log.new_values=[GroupRead.model_validate(group).model_dump(mode="json")]
