@@ -27,6 +27,16 @@ class AccountNotVerified(DivvyError):
         )
 
 
+class AccountNotActive(DivvyError):
+    def __init__(self):
+        super().__init__(
+            message="Account Not Active",
+            error_code="account_not_active",
+            resolution="Your account has been deactivated",
+            status_code=status.HTTP_403_FORBIDDEN,
+        )
+
+
 def create_exception_handler(status_code: int, initial_detail: dict[str, Any]):
     async def exception_handler(_: Request, __: Exception):
         return JSONResponse(
@@ -87,6 +97,17 @@ def register_all_errors(app: FastAPI):
                 "message": "Account Not Verified",
                 "error_code": "account_not_verified",
                 "resolution": "Please check your email for verification details",
+            },
+        ),
+    )
+    app.add_exception_handler(
+        AccountNotActive,
+        create_exception_handler(
+            status_code=status.HTTP_403_FORBIDDEN,
+            initial_detail={
+                "message": "Account Not Active",
+                "error_code": "account_not_active",
+                "resolution": "Your account has been deactivated",
             },
         ),
     )

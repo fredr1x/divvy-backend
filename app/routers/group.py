@@ -12,6 +12,9 @@ from app.services.group.group_service import (
     get_group_by_id as get_group_by_id_service,
 )
 from app.services.group.group_service import (
+    delete_group as delete_group_service,
+)
+from app.services.group.group_service import (
     get_invitation_link_by_group_id,
 )
 from app.services.group.group_service import (
@@ -73,7 +76,7 @@ async def create_group(
     return await create_group_service(get_ip_address(request),
                                       db,
                                       payload.name,
-                                      payload.creator_id,
+                                      current_user.id,
                                       payload.currency,
                                       current_user
                                       )
@@ -136,3 +139,13 @@ async def invitation_link_by_group_id(
         HTTPException 404: If group not found
     """
     return await get_invitation_link_by_group_id(get_ip_address(request), db, id, current_user)
+
+
+@router.delete("/{id}", status_code=204)
+async def delete_group(
+    request: Request,
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_verified_user),
+) -> None:
+    await delete_group_service(get_ip_address(request), id, db, current_user)

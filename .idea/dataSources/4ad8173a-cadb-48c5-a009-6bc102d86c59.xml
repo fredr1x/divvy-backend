@@ -11,8 +11,9 @@
 4||10|c|G
 4||10|C|G
 4||10|T|G</Grants>
+      <IntrospectionStateNumber>1068</IntrospectionStateNumber>
       <ServerVersion>16.12</ServerVersion>
-      <StartupTime>1776945697</StartupTime>
+      <StartupTime>1777477876</StartupTime>
       <TimeZones>true ACDT
 true ACSST
 false ACST
@@ -52,7 +53,7 @@ false Africa/Bissau
 false Africa/Blantyre
 false Africa/Brazzaville
 false Africa/Bujumbura
-false Africa/Cairo
+true Africa/Cairo
 false Africa/Casablanca
 true Africa/Ceuta
 false Africa/Conakry
@@ -706,6 +707,7 @@ true posixrules
 13276||10|C|G
 13276||-9223372036854775808|U|G
 13276||10|U|G</Grants>
+      <IntrospectionStateNumber>1068</IntrospectionStateNumber>
       <ObjectId>16384</ObjectId>
       <OwnerName>divvy</OwnerName>
     </database>
@@ -4130,8 +4132,11 @@ true posixrules
       <AutoIntrospectionLevel>3</AutoIntrospectionLevel>
       <Comment>standard public schema</Comment>
       <Current>1</Current>
+      <LastIntrospectionL1Xid>1068</LastIntrospectionL1Xid>
+      <LastIntrospectionL2Xid>1068</LastIntrospectionL2Xid>
+      <LastIntrospectionL3Xid>1068</LastIntrospectionL3Xid>
       <LastIntrospectionLevel>3</LastIntrospectionLevel>
-      <LastIntrospectionLocalTimestamp>2026-04-23.11:37:45</LastIntrospectionLocalTimestamp>
+      <LastIntrospectionLocalTimestamp>2026-04-29.15:57:59</LastIntrospectionLocalTimestamp>
       <ObjectId>2200</ObjectId>
       <StateNumber>524</StateNumber>
       <OwnerName>pg_database_owner</OwnerName>
@@ -4155,7 +4160,8 @@ DELETE
 LOGIN
 LOGOUT
 REGISTER
-READ</Labels>
+READ
+EXTRACT</Labels>
       <ObjectId>16768</ObjectId>
       <StateNumber>992</StateNumber>
       <SubCategory>enum</SubCategory>
@@ -4505,7 +4511,7 @@ REFUND</Labels>
     <table id="306" parent="264" name="users">
       <DetailsLevel>2</DetailsLevel>
       <ObjectId>16398</ObjectId>
-      <StateNumber>732</StateNumber>
+      <StateNumber>1032</StateNumber>
       <AccessMethodId>2</AccessMethodId>
       <OwnerName>divvy</OwnerName>
     </table>
@@ -4852,8 +4858,9 @@ currency</ColNames>
     <foreign-key id="354" parent="295" name="expense_splits_group_expense_id_fkey">
       <ColNames>group_expense_id</ColNames>
       <NameSurrogate>1</NameSurrogate>
-      <ObjectId>16508</ObjectId>
-      <StateNumber>732</StateNumber>
+      <ObjectId>16809</ObjectId>
+      <OnDelete>cascade</OnDelete>
+      <StateNumber>1067</StateNumber>
       <RefKeyColPositions>1</RefKeyColPositions>
       <RefTableId>16448</RefTableId>
     </foreign-key>
@@ -4962,8 +4969,9 @@ currency</ColNames>
     <foreign-key id="369" parent="296" name="group_expenses_group_id_fkey">
       <ColNames>group_id</ColNames>
       <NameSurrogate>1</NameSurrogate>
-      <ObjectId>16459</ObjectId>
-      <StateNumber>732</StateNumber>
+      <ObjectId>16814</ObjectId>
+      <OnDelete>cascade</OnDelete>
+      <StateNumber>1067</StateNumber>
       <RefKeyColPositions>1</RefKeyColPositions>
       <RefTableId>16432</RefTableId>
     </foreign-key>
@@ -5044,8 +5052,9 @@ currency</ColNames>
     <foreign-key id="380" parent="297" name="group_media_group_id_fkey">
       <ColNames>group_id</ColNames>
       <NameSurrogate>1</NameSurrogate>
-      <ObjectId>16631</ObjectId>
-      <StateNumber>942</StateNumber>
+      <ObjectId>16819</ObjectId>
+      <OnDelete>cascade</OnDelete>
+      <StateNumber>1067</StateNumber>
       <RefKeyColPositions>1</RefKeyColPositions>
       <RefTableId>16432</RefTableId>
     </foreign-key>
@@ -5060,8 +5069,9 @@ currency</ColNames>
     <foreign-key id="382" parent="297" name="group_media_expense_id_fkey">
       <ColNames>expense_id</ColNames>
       <NameSurrogate>1</NameSurrogate>
-      <ObjectId>16626</ObjectId>
-      <StateNumber>942</StateNumber>
+      <ObjectId>16824</ObjectId>
+      <OnDelete>cascade</OnDelete>
+      <StateNumber>1067</StateNumber>
       <RefKeyColPositions>1</RefKeyColPositions>
       <RefTableId>16448</RefTableId>
     </foreign-key>
@@ -5223,8 +5233,9 @@ currency</ColNames>
     <foreign-key id="403" parent="299" name="item_splits_item_id_fkey">
       <ColNames>item_id</ColNames>
       <NameSurrogate>1</NameSurrogate>
-      <ObjectId>16594</ObjectId>
-      <StateNumber>844</StateNumber>
+      <ObjectId>16829</ObjectId>
+      <OnDelete>cascade</OnDelete>
+      <StateNumber>1067</StateNumber>
       <RefKeyColPositions>1</RefKeyColPositions>
       <RefTableId>16574</RefTableId>
     </foreign-key>
@@ -5312,8 +5323,9 @@ user_id</ColNames>
     <foreign-key id="415" parent="300" name="items_group_expense_id_fkey">
       <ColNames>group_expense_id</ColNames>
       <NameSurrogate>1</NameSurrogate>
-      <ObjectId>16580</ObjectId>
-      <StateNumber>844</StateNumber>
+      <ObjectId>16834</ObjectId>
+      <OnDelete>cascade</OnDelete>
+      <StateNumber>1067</StateNumber>
       <RefKeyColPositions>1</RefKeyColPositions>
       <RefTableId>16448</RefTableId>
     </foreign-key>
@@ -5667,8 +5679,9 @@ user_id</ColNames>
     <foreign-key id="462" parent="305" name="user_groups_group_id_fkey">
       <ColNames>group_id</ColNames>
       <NameSurrogate>1</NameSurrogate>
-      <ObjectId>16484</ObjectId>
-      <StateNumber>732</StateNumber>
+      <ObjectId>16839</ObjectId>
+      <OnDelete>cascade</OnDelete>
+      <StateNumber>1067</StateNumber>
       <RefKeyColPositions>1</RefKeyColPositions>
       <RefTableId>16432</RefTableId>
     </foreign-key>
@@ -5759,7 +5772,15 @@ user_id</ColNames>
       <StoredType>varchar(256)|0s</StoredType>
       <TypeId>1043</TypeId>
     </column>
-    <index id="475" parent="306" name="users_pkey">
+    <column id="475" parent="306" name="is_verified">
+      <DefaultExpression>false</DefaultExpression>
+      <NotNull>1</NotNull>
+      <Position>12</Position>
+      <StateNumber>1032</StateNumber>
+      <StoredType>boolean|0s</StoredType>
+      <TypeId>16</TypeId>
+    </column>
+    <index id="476" parent="306" name="users_pkey">
       <ColNames>id</ColNames>
       <NameSurrogate>1</NameSurrogate>
       <ObjectId>16404</ObjectId>
@@ -5768,7 +5789,7 @@ user_id</ColNames>
       <Unique>1</Unique>
       <AccessMethodId>403</AccessMethodId>
     </index>
-    <index id="476" parent="306" name="ix_users_email">
+    <index id="477" parent="306" name="ix_users_email">
       <ColNames>email</ColNames>
       <ObjectId>16518</ObjectId>
       <StateNumber>732</StateNumber>
@@ -5778,7 +5799,7 @@ user_id</ColNames>
       <CollationIds>100</CollationIds>
       <CollationParentNames>pg_catalog</CollationParentNames>
     </index>
-    <index id="477" parent="306" name="users_google_sub_key">
+    <index id="478" parent="306" name="users_google_sub_key">
       <ColNames>google_sub</ColNames>
       <NameSurrogate>1</NameSurrogate>
       <ObjectId>16406</ObjectId>
@@ -5789,20 +5810,20 @@ user_id</ColNames>
       <CollationIds>100</CollationIds>
       <CollationParentNames>pg_catalog</CollationParentNames>
     </index>
-    <key id="478" parent="306" name="users_pkey">
+    <key id="479" parent="306" name="users_pkey">
       <NameSurrogate>1</NameSurrogate>
       <ObjectId>16405</ObjectId>
       <Primary>1</Primary>
       <StateNumber>732</StateNumber>
       <UnderlyingIndexId>16404</UnderlyingIndexId>
     </key>
-    <key id="479" parent="306" name="users_google_sub_key">
+    <key id="480" parent="306" name="users_google_sub_key">
       <NameSurrogate>1</NameSurrogate>
       <ObjectId>16407</ObjectId>
       <StateNumber>732</StateNumber>
       <UnderlyingIndexId>16406</UnderlyingIndexId>
     </key>
-    <column id="480" parent="307" name="id">
+    <column id="481" parent="307" name="id">
       <DefaultExpression>nextval(&apos;virtual_cards_id_seq&apos;::regclass)</DefaultExpression>
       <NotNull>1</NotNull>
       <Position>1</Position>
@@ -5811,77 +5832,77 @@ user_id</ColNames>
       <SequenceId>16705</SequenceId>
       <TypeId>23</TypeId>
     </column>
-    <column id="481" parent="307" name="user_id">
+    <column id="482" parent="307" name="user_id">
       <NotNull>1</NotNull>
       <Position>2</Position>
       <StateNumber>956</StateNumber>
       <StoredType>integer|0s</StoredType>
       <TypeId>23</TypeId>
     </column>
-    <column id="482" parent="307" name="stripe_customer_id">
+    <column id="483" parent="307" name="stripe_customer_id">
       <NotNull>1</NotNull>
       <Position>3</Position>
       <StateNumber>956</StateNumber>
       <StoredType>varchar(128)|0s</StoredType>
       <TypeId>1043</TypeId>
     </column>
-    <column id="483" parent="307" name="stripe_payment_method_id">
+    <column id="484" parent="307" name="stripe_payment_method_id">
       <NotNull>1</NotNull>
       <Position>4</Position>
       <StateNumber>956</StateNumber>
       <StoredType>varchar(128)|0s</StoredType>
       <TypeId>1043</TypeId>
     </column>
-    <column id="484" parent="307" name="card_number">
+    <column id="485" parent="307" name="card_number">
       <NotNull>1</NotNull>
       <Position>5</Position>
       <StateNumber>964</StateNumber>
       <StoredType>varchar(128)|0s</StoredType>
       <TypeId>1043</TypeId>
     </column>
-    <column id="485" parent="307" name="card_last4">
+    <column id="486" parent="307" name="card_last4">
       <NotNull>1</NotNull>
       <Position>6</Position>
       <StateNumber>956</StateNumber>
       <StoredType>varchar(4)|0s</StoredType>
       <TypeId>1043</TypeId>
     </column>
-    <column id="486" parent="307" name="card_exp_month">
+    <column id="487" parent="307" name="card_exp_month">
       <NotNull>1</NotNull>
       <Position>7</Position>
       <StateNumber>956</StateNumber>
       <StoredType>integer|0s</StoredType>
       <TypeId>23</TypeId>
     </column>
-    <column id="487" parent="307" name="card_exp_year">
+    <column id="488" parent="307" name="card_exp_year">
       <NotNull>1</NotNull>
       <Position>8</Position>
       <StateNumber>956</StateNumber>
       <StoredType>integer|0s</StoredType>
       <TypeId>23</TypeId>
     </column>
-    <column id="488" parent="307" name="card_brand">
+    <column id="489" parent="307" name="card_brand">
       <NotNull>1</NotNull>
       <Position>9</Position>
       <StateNumber>956</StateNumber>
       <StoredType>varchar(64)|0s</StoredType>
       <TypeId>1043</TypeId>
     </column>
-    <column id="489" parent="307" name="is_active">
+    <column id="490" parent="307" name="is_active">
       <NotNull>1</NotNull>
       <Position>11</Position>
       <StateNumber>956</StateNumber>
       <StoredType>boolean|0s</StoredType>
       <TypeId>16</TypeId>
     </column>
-    <column id="490" parent="307" name="created_at">
+    <column id="491" parent="307" name="created_at">
       <NotNull>1</NotNull>
       <Position>12</Position>
       <StateNumber>956</StateNumber>
       <StoredType>timestamp|0s</StoredType>
       <TypeId>1114</TypeId>
     </column>
-    <foreign-key id="491" parent="307" name="virtual_cards_user_id_fkey">
+    <foreign-key id="492" parent="307" name="virtual_cards_user_id_fkey">
       <ColNames>user_id</ColNames>
       <NameSurrogate>1</NameSurrogate>
       <ObjectId>16716</ObjectId>
@@ -5889,7 +5910,7 @@ user_id</ColNames>
       <RefKeyColPositions>1</RefKeyColPositions>
       <RefTableId>16398</RefTableId>
     </foreign-key>
-    <index id="492" parent="307" name="virtual_cards_pkey">
+    <index id="493" parent="307" name="virtual_cards_pkey">
       <ColNames>id</ColNames>
       <NameSurrogate>1</NameSurrogate>
       <ObjectId>16710</ObjectId>
@@ -5898,7 +5919,7 @@ user_id</ColNames>
       <Unique>1</Unique>
       <AccessMethodId>403</AccessMethodId>
     </index>
-    <index id="493" parent="307" name="virtual_cards_stripe_customer_id_key">
+    <index id="494" parent="307" name="virtual_cards_stripe_customer_id_key">
       <ColNames>stripe_customer_id</ColNames>
       <NameSurrogate>1</NameSurrogate>
       <ObjectId>16714</ObjectId>
@@ -5909,7 +5930,7 @@ user_id</ColNames>
       <CollationIds>100</CollationIds>
       <CollationParentNames>pg_catalog</CollationParentNames>
     </index>
-    <index id="494" parent="307" name="virtual_cards_card_number_key">
+    <index id="495" parent="307" name="virtual_cards_card_number_key">
       <ColNames>card_number</ColNames>
       <NameSurrogate>1</NameSurrogate>
       <ObjectId>16742</ObjectId>
@@ -5920,20 +5941,20 @@ user_id</ColNames>
       <CollationIds>100</CollationIds>
       <CollationParentNames>pg_catalog</CollationParentNames>
     </index>
-    <key id="495" parent="307" name="virtual_cards_pkey">
+    <key id="496" parent="307" name="virtual_cards_pkey">
       <NameSurrogate>1</NameSurrogate>
       <ObjectId>16711</ObjectId>
       <Primary>1</Primary>
       <StateNumber>956</StateNumber>
       <UnderlyingIndexId>16710</UnderlyingIndexId>
     </key>
-    <key id="496" parent="307" name="virtual_cards_stripe_customer_id_key">
+    <key id="497" parent="307" name="virtual_cards_stripe_customer_id_key">
       <NameSurrogate>1</NameSurrogate>
       <ObjectId>16715</ObjectId>
       <StateNumber>956</StateNumber>
       <UnderlyingIndexId>16714</UnderlyingIndexId>
     </key>
-    <key id="497" parent="307" name="virtual_cards_card_number_key">
+    <key id="498" parent="307" name="virtual_cards_card_number_key">
       <NameSurrogate>1</NameSurrogate>
       <ObjectId>16743</ObjectId>
       <StateNumber>964</StateNumber>

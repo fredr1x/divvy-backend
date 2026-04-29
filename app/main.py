@@ -11,6 +11,7 @@ from app.jobs.currency_rates_job import update_currency_rates
 
 from app.routers import (
     auth_router,
+    user_router,
     expense_split_router,
     group_expense_router,
     group_media_router,
@@ -69,6 +70,8 @@ app.add_middleware(
 register_all_errors(app)
 
 app.include_router(auth_router)
+
+app.include_router(user_router)
 
 app.include_router(test_table_router)
 

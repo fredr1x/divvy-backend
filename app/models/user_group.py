@@ -20,7 +20,7 @@ class UserGroup(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
 
     group_id: Mapped[int] = mapped_column(
-        ForeignKey("groups.id"), nullable=False
+        ForeignKey("groups.id", ondelete="CASCADE"), nullable=False
     )
 
     user_id: Mapped[int] = mapped_column(
