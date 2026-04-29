@@ -21,6 +21,7 @@ from app.routers import (
     user_group_router,
     virtual_card_router,
 )
+from starlette.middleware.cors import CORSMiddleware
 
 logging.basicConfig(
     level=logging.WARNING,
@@ -56,6 +57,14 @@ async def lifespan(app: FastAPI):
         scheduler.shutdown(wait=False)
 
 app = FastAPI(title="Divvy API", lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 register_all_errors(app)
 
