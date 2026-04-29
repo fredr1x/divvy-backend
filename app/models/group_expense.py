@@ -25,7 +25,7 @@ class GroupExpense(Base):
     )
 
     group_id: Mapped[int] = mapped_column(
-        ForeignKey("groups.id"), nullable=False
+        ForeignKey("groups.id", ondelete="CASCADE"), nullable=False
     )
 
     name: Mapped[str] = mapped_column(

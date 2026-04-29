@@ -23,7 +23,7 @@ class ExpenseSplit(Base):
     )
 
     group_expense_id: Mapped[int] = mapped_column(
-        ForeignKey("group_expenses.id"), nullable=False
+        ForeignKey("group_expenses.id", ondelete="CASCADE"), nullable=False
     )
 
     owed_amount: Mapped[Decimal] = mapped_column(

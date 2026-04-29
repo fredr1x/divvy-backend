@@ -116,7 +116,7 @@ async def get_groups_by_user(db: AsyncSession, user: User) -> list[GroupRead]:
 async def get_invitation_link_by_group_id(
     ip_address: str,
     db: AsyncSession,
-    id: int,
+    group_id: int,
     current_user: User,
 ) -> str:
 
@@ -127,14 +127,7 @@ async def get_invitation_link_by_group_id(
         entity_name="GROUP",
     )
 
-    group = await db.scalar(select(Group)
-                            .join(UserGroup, UserGroup.group_id == Group.id)
-                            .where(UserGroup.user_id == current_user.id, UserGroup.group_id == id))
-
-    if not group:
-        message = "Group not found"
-        await create_failed_audit_log(db, audit_log, message)
-        raise HTTPException(status_code=404, detail=message)
+    group = await get_group_by_id(ip_address, db, group_id, current_user)
 
     audit_log.entity_id=group.id
     audit_log.message="Successfully retrieved group invitation link"
@@ -161,14 +154,7 @@ async def update_group(
         entity_name="GROUP",
     )
 
-    group = await db.scalar(select(Group)
-                            .join(UserGroup, UserGroup.group_id == Group.id)
-                            .where(UserGroup.user_id == current_user.id, UserGroup.group_id == group_id))
-
-    if not group:
-        message="Group not found"
-        await create_failed_audit_log(db, audit_log, message)
-        raise HTTPException(status_code=404, detail=message)
+    group = await get_group_by_id(ip_address, db, group_id, current_user)
 
     audit_log.old_values=[GroupRead.model_validate(group).model_dump(mode="json")]
 
@@ -198,6 +184,51 @@ async def update_group(
     await db.commit()
 
     return group
+
+
+async def delete_group(
+    ip_address: str,
+    group_id: int,
+    db: AsyncSession,
+    current_user: User,
+):
+    audit_log: AuditLog = AuditLog(
+        user_id=current_user.id,
+        action_type=ActionType.DELETE,
+        ip_address=ip_address,
+        entity_name="GROUP",
+    )
+
+    group = await db.scalar(
+        select(Group)
+        .join(UserGroup, UserGroup.group_id == Group.id)
+        .where(UserGroup.user_id == current_user.id, UserGroup.group_id == group_id)
+    )
+    if not group:
+        message = "Group not found"
+        await create_failed_audit_log(db, audit_log, message)
+        raise HTTPException(status_code=404, detail=message)
+
+    current_user_group = await db.scalar(
+        select(UserGroup).where(
+            UserGroup.group_id == group_id,
+            UserGroup.user_id == current_user.id,
+        )
+    )
+    if not current_user_group or current_user_group.group_role != GroupRole.CREATOR:
+        message = "Only group creator can delete group"
+        await create_failed_audit_log(db, audit_log, message)
+        raise HTTPException(status_code=403, detail=message)
+
+    audit_log.entity_id = group.id
+    audit_log.old_values = [GroupRead.model_validate(group).model_dump(mode="json")]
+
+    await db.delete(group)
+
+    audit_log.action_status = ActionStatus.SUCCESS
+    audit_log.message = "Group deleted successfully"
+    db.add(audit_log)
+    await db.commit()
 
 
 def generate_invitation_link() -> str:

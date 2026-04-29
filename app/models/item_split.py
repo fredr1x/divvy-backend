@@ -21,7 +21,7 @@ class ItemSplit(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
 
     item_id: Mapped[int] = mapped_column(
-        ForeignKey("items.id"), nullable=False
+        ForeignKey("items.id", ondelete="CASCADE"), nullable=False
     )
 
     user_id: Mapped[int] = mapped_column(

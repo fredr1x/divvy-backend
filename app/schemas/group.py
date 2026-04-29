@@ -15,7 +15,6 @@ class GroupUpdate(BaseModel):
 
 class GroupCreate(BaseModel):
     name: GroupName
-    creator_id: int
     currency: Currency
 
 

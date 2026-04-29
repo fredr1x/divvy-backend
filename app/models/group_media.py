@@ -14,7 +14,7 @@ class GroupMedia(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
 
     group_id: Mapped[int] = mapped_column(
-        ForeignKey("groups.id"), nullable=False
+        ForeignKey("groups.id", ondelete="CASCADE"), nullable=False
     )
 
     uploaded_by: Mapped[int] = mapped_column(
@@ -22,7 +22,7 @@ class GroupMedia(Base):
     )
 
     expense_id: Mapped[int | None] = mapped_column(
-        ForeignKey("group_expenses.id"), nullable=True
+        ForeignKey("group_expenses.id", ondelete="CASCADE"), nullable=True
     )
 
     category: Mapped[MediaCategory] = mapped_column(

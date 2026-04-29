@@ -17,7 +17,14 @@ def hash_password(password: str) -> str:
 def verify_password(password: str, hashed_password: str) -> bool:
     return pwd_context.verify(password, hashed_password)
 
-def create_access_token(subject: str, first_name: str, last_name: str, email: str, is_verified: bool) -> str:
+def create_access_token(
+    subject: str,
+    first_name: str,
+    last_name: str,
+    email: str,
+    is_verified: bool,
+    is_active: bool,
+) -> str:
     expire = datetime.now() + timedelta(
         minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
     )
@@ -29,7 +36,8 @@ def create_access_token(subject: str, first_name: str, last_name: str, email: st
         "email": email,
         "first_name": first_name,
         "last_name": last_name,
-        "is_verified": is_verified
+        "is_verified": is_verified,
+        "is_active": is_active,
     }
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 

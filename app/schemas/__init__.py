@@ -5,7 +5,7 @@ from app.schemas.auth import (
     TokenPair,
 )
 from app.schemas.test_table import TestTableCreate, TestTableRead
-from app.schemas.user import UserCreate, UserRead
+from app.schemas.user import UserCreate, UserRead, UserUpdate
 from app.schemas.group import GroupCreate, GroupRead, GroupUpdate
 from app.schemas.group_expense import GroupExpenseCreate, GroupExpenseRead, GroupExpenseUpdate
 from app.schemas.user_group import UserGroupRead, UserGroupAddMemberByEmail
