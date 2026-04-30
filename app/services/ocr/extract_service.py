@@ -25,10 +25,10 @@ async def extract_items(
     files: list[UploadFile],
     state: AppState,
 ):
-
     audit_log: AuditLog = AuditLog(
         user_id=current_user.id,
         action_type=ActionType.EXTRACT,
+        action_status=ActionStatus.SUCCESS,
         ip_address=ip_address,
         entity_name="EXTRACT_RECEIPT",
     )
@@ -52,34 +52,48 @@ async def extract_items(
         files=files,
     )
 
-    await create_log(
-        db=db, audit_log=audit_log, message="Sending files to Claude Sonnet"
-    )
+    await create_log(db=db, audit_log=audit_log, message="Sending files to Claude Sonnet")
 
     raw_results = await asyncio.gather(
         *[_process_single(f, state) for f in files], return_exceptions=True
     )
 
     receipts: list[dict] = []
+    failure_messages: list[str] = []
     for i, result in enumerate(raw_results):
         if isinstance(result, APIError):
+            err_msg = f"Claude error for {files[i].filename}: {result}"
+            failure_messages.append(err_msg)
             await create_failed_audit_log(
                 db=db,
                 audit_log=audit_log,
-                message=f"Claude error, err: {result}",
+                message=err_msg,
             )
         elif isinstance(result, Exception):
+            err_msg = f"Failed to extract {files[i].filename}: {type(result).__name__}: {result}"
+            failure_messages.append(err_msg)
             await create_failed_audit_log(
-                db=db, audit_log=audit_log, message=f"Failed to extract, err: {result}"
+                db=db, audit_log=audit_log, message=err_msg
             )
         elif result is None:
+            err_msg = f"Extraction returned None for file {files[i].filename}"
+            failure_messages.append(err_msg)
             await create_failed_audit_log(
                 db=db,
                 audit_log=audit_log,
-                message=f"Extraction returned None for file {files[i].filename})",
+                message=err_msg,
             )
         else:
             receipts.append(result)
+
+    if not receipts:
+        await create_failed_audit_log(
+            db=db, audit_log=audit_log, message="No valid extraction results"
+        )
+        detail = "Could not extract receipt items from provided files"
+        if failure_messages:
+            detail = f"{detail}. Reasons: {' | '.join(failure_messages[:3])}"
+        raise HTTPException(422, detail)
 
     merged_receipts = clean_and_merge(receipts)
 
@@ -91,7 +105,6 @@ async def extract_items(
 
 
 async def call_vlm(img_b64: str, state: AppState):
-
     query_content = []
 
     query_content.append(
