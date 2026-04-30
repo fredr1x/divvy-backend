@@ -10,6 +10,7 @@ async def create_log(
     message: str,
 ) -> None:
     audit_log.message = message
+    audit_log.action_status=ActionStatus.SUCCESS
     db.add(audit_log)
     await db.commit()
 
