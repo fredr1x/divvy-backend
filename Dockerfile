@@ -23,7 +23,7 @@ RUN pip install --no-cache-dir --extra-index-url https://download.pytorch.org/wh
 
 COPY . .
 
-RUN chmod +x entrypoint.sh
+RUN chmod +x ./entrypoint.sh
 
 EXPOSE 8001
 
