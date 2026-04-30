@@ -28,13 +28,13 @@ async def preprocess_receipt(state: AppState, img_bytes: bytes) -> str:
     return b64
 
 
-async def _crop_receipt(img: np.ndarray, results) -> np.ndarray:
+async def _crop_receipt(img: Image.Image, results) -> Image.Image:
     if not results or len(results[0].boxes) == 0:
         return img
 
-    box = results[0].boxes.xyxy[0].cpu().numpy().astype(np.uint16)
+    box = results[0].boxes.xyxy[0].cpu().numpy().astype(int)
     x1, y1, x2, y2 = box
-    return img[y1:y2, x1:x2]
+    return img.crop((x1, y1, x2, y2))
 
 
 async def clean_and_merge(receipts: list[dict]):
