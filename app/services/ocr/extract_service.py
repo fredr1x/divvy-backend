@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.models import AuditLog, User
 from app.models.enums import ActionStatus, ActionType
-from app.schemas.item import ReceiptItems
+from app.schemas.item import ReceiptItems, OutputSchema
 from app.services.audit.audit_logs_service import create_failed_audit_log, create_log
 from app.services.group.group_media_service import upload_receipt
 from app.services.ocr.const import AppState
@@ -52,7 +52,9 @@ async def extract_items(
         files=files,
     )
 
-    await create_log(db=db, audit_log=audit_log, message="Sending files to Claude Sonnet")
+    await create_log(
+        db=db, audit_log=audit_log, message="Sending files to Claude Sonnet"
+    )
 
     raw_results = await asyncio.gather(
         *[_process_single(f, state) for f in files], return_exceptions=True
@@ -72,9 +74,7 @@ async def extract_items(
         elif isinstance(result, Exception):
             err_msg = f"Failed to extract {files[i].filename}: {type(result).__name__}: {result}"
             failure_messages.append(err_msg)
-            await create_failed_audit_log(
-                db=db, audit_log=audit_log, message=err_msg
-            )
+            await create_failed_audit_log(db=db, audit_log=audit_log, message=err_msg)
         elif result is None:
             err_msg = f"Extraction returned None for file {files[i].filename}"
             failure_messages.append(err_msg)
@@ -132,7 +132,7 @@ async def call_vlm(img_b64: str, state: AppState):
                 "content": query_content,
             },
         ],
-        output_config={"format": ReceiptItems},
+        output_config=OutputSchema
     )
 
     return json.loads(raw.content[0].text)

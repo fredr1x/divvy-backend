@@ -45,3 +45,39 @@ class ReceiptItem(BaseModel):
 
 class ReceiptItems(BaseModel):
     items: list[ReceiptItem]
+
+
+OutputSchema = {
+    "format": {
+        "type": "json_schema",
+        "schema": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "item_name": {
+                                "type": "string",
+                                "description": "Full product description exactly as printed on the receipt",
+                            },
+                            "quantity": {
+                                "type": "integer",
+                                "description": "Explicitly printed quantity, or 1 if not shown. Never use weight as quantity.",
+                            },
+                            "price": {
+                                "type": ["number", "null"],
+                                "description": "Final line-item total. Null if price is not visible or legible.",
+                            },
+                        },
+                        "additionalProperties": False,
+                        "required": ["item_name", "quantity", "price"],
+                    },
+                }
+            },
+            "additionalProperties": False,
+            "required": ["items"],
+        },
+    }
+}
