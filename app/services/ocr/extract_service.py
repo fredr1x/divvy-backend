@@ -43,14 +43,6 @@ async def extract_items(
         await create_failed_audit_log(db=db, audit_log=audit_log, message=message)
         raise HTTPException(400, "Number of images per request exceeded 20")
 
-    _ = await upload_receipt(
-        ip_address=ip_address,
-        group_id=group_id,
-        expense_id=expense_id,
-        db=db,
-        current_user=current_user,
-        files=files,
-    )
 
     audit_log.action_status=ActionStatus.SUCCESS
     await create_log(
@@ -103,6 +95,15 @@ async def extract_items(
         db=db, audit_log=audit_log, message="Successfully Extracted Receipt items!"
     )
 
+    _ = await upload_receipt(
+        ip_address=ip_address,
+        group_id=group_id,
+        expense_id=expense_id,
+        db=db,
+        current_user=current_user,
+        files=files,
+    )
+
     return merged_receipts
 
 
@@ -141,7 +142,7 @@ async def call_vlm(img_b64: str, state: AppState):
 
 
 async def _process_single(file: UploadFile, state: AppState) -> dict:
-    img_bytes = await file.read()
+    img_bytes = await file.file.read()
     img_b64: str = await preprocess_receipt(state, img_bytes)  # ← await every async call
     response = await call_vlm(img_b64, state)  # ← await every async call
     return json.loads(response)
