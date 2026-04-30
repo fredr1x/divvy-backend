@@ -1,5 +1,6 @@
 import uuid
 
+from app.core.config import settings
 from app.models.enums import ActionType, ActionStatus
 from fastapi import HTTPException
 from sqlalchemy import select
@@ -232,7 +233,7 @@ async def delete_group(
 
 
 def generate_invitation_link() -> str:
-    return str("http://localhost:8001/invite/" + uuid.uuid4().__str__())
+    return str(f"{settings.BACKEND_DOMAIN}/user-groups/invite/" + uuid.uuid4().__str__())
 
 
 async def add_creator_to_user_group(

@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = False
 
-    BACKEND_DOMAIN: str | None = "localhost:8001"
-    FRONTEND_DOMAIN: str | None = "localhost:3000"
+    BACKEND_DOMAIN: str | None = "http://localhost:8001"
+    FRONTEND_DOMAIN: str | None = "http://localhost:3000"
 
 settings = Settings()

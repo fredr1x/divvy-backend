@@ -1,4 +1,5 @@
 import smtplib
+from html import escape
 from email.mime.text import MIMEText
 
 from app.core.config import settings
@@ -30,6 +31,10 @@ async def send_email(msg: MIMEText, to):
 
 
 def invite_email_template(group_name: str, invite_link: str) -> str:
+    normalized_link = _normalize_absolute_url(invite_link)
+    safe_group_name = escape(group_name)
+    safe_link = escape(normalized_link, quote=True)
+
     return f"""
     <!DOCTYPE html>
     <html>
@@ -39,10 +44,10 @@ def invite_email_template(group_name: str, invite_link: str) -> str:
 
         <h2 style="color: #222; margin-bottom: 10px;">You've been invited to a group</h2>
         <p style="color: #666; font-size: 15px;">
-          You have received an invitation to join <strong>{group_name}</strong>
+          You have received an invitation to join <strong>{safe_group_name}</strong>
         </p>
 
-        <a href="{invite_link}"
+        <a href="{safe_link}" target="_blank" rel="noopener noreferrer"
            style="display: inline-block;
                   background-color: #4F46E5;
                   color: white;
@@ -51,13 +56,14 @@ def invite_email_template(group_name: str, invite_link: str) -> str:
                   border-radius: 8px;
                   font-size: 16px;
                   font-weight: bold;
-                  margin-top: 30px;">
+                  margin-top: 30px;
+                  cursor: pointer;">
           Join Group
         </a>
 
         <p style="color: #bbb; font-size: 12px; margin-top: 30px;">
           If the button doesn't work, click the link below:<br>
-          <a href="{invite_link}" style="color: #4F46E5;">{invite_link}</a>
+          <a href="{safe_link}" target="_blank" rel="noopener noreferrer" style="color: #4F46E5; word-break: break-all;">{safe_link}</a>
         </p>
 
       </div>
@@ -76,3 +82,12 @@ def verification_email_template(link: str) -> str:
     </html>
     
     """
+
+
+def _normalize_absolute_url(link: str) -> str:
+    value = (link or "").strip()
+    if not value:
+        return value
+    if value.startswith(("http://", "https://")):
+        return value
+    return f"http://{value}"
