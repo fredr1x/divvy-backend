@@ -88,7 +88,7 @@ async def extract_items(
             detail = f"{detail}. Reasons: {' | '.join(failure_messages[:3])}"
         raise HTTPException(422, detail)
 
-    merged_receipts = clean_and_merge(receipts)
+    merged_receipts = await clean_and_merge(receipts)
 
     audit_log.action_status=ActionStatus.SUCCESS
     await create_log(
@@ -142,7 +142,7 @@ async def call_vlm(img_b64: str, state: AppState):
 
 
 async def _process_single(file: UploadFile, state: AppState) -> dict:
-    img_bytes = file.file.read()
+    img_bytes = await file.read()
     img_b64: str = await preprocess_receipt(state, img_bytes)  # ← await every async call
     response = await call_vlm(img_b64, state)  # ← await every async call
     return json.loads(response)

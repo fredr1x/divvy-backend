@@ -19,7 +19,7 @@ async def preprocess_receipt(state: AppState, img_bytes: bytes) -> str:
     if state.yolo is not None:
         img_array = np.array(img)
         results = await asyncio.to_thread(state.yolo.predict, img_array, verbose=False)
-        img = _crop_receipt(img, results)
+        img = await _crop_receipt(img, results)
 
     buffer = io.BytesIO()
     img.save(buffer, format="JPEG")
