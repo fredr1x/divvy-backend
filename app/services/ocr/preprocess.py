@@ -8,17 +8,21 @@ from app.services.ocr.const import AppState
 
 
 async def preprocess_receipt(state: AppState, img_bytes: bytes) -> str:
-    img = Image.open(io.BytesIO(img_bytes))
-    if img is None:
-        raise ValueError("Unable to decode uploaded image")
-    
+    try:
+        img = Image.open(io.BytesIO(img_bytes))
+        img.verify()
+    except Exception as e:
+        raise ValueError(f"Unable to decode uploaded image: {e}")
+
+    img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+
     if state.yolo is not None:
         img_array = np.array(img)
         results = await asyncio.to_thread(state.yolo.predict, img_array, verbose=False)
         img = _crop_receipt(img, results)
 
     buffer = io.BytesIO()
-    # img.save(buffer, format="JPEG")
+    img.save(buffer, format="JPEG")
     b64 = base64.b64encode(buffer.getvalue()).decode()
 
     return b64
