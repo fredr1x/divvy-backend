@@ -52,6 +52,7 @@ async def extract_items(
         files=files,
     )
 
+    audit_log.action_status=ActionStatus.SUCCESS
     await create_log(
         db=db, audit_log=audit_log, message="Sending files to Claude Sonnet"
     )
@@ -97,6 +98,7 @@ async def extract_items(
 
     merged_receipts = clean_and_merge(receipts)
 
+    audit_log.action_status=ActionStatus.SUCCESS
     await create_log(
         db=db, audit_log=audit_log, message="Successfully Extracted Receipt items!"
     )
