@@ -73,7 +73,7 @@ async def extract_items(
                 db=db, audit_log=audit_log, message=f"Failed to extract, err: {result}"
             )
         elif result is None:
-            create_failed_audit_log(
+            await create_failed_audit_log(
                 db=db,
                 audit_log=audit_log,
                 message=f"Extraction returned None for file {files[i].filename})",
@@ -83,7 +83,6 @@ async def extract_items(
 
     merged_receipts = clean_and_merge(receipts)
 
-    audit_log.action_status = ActionStatus.SUCCESS
     await create_log(
         db=db, audit_log=audit_log, message="Successfully Extracted Receipt items!"
     )
