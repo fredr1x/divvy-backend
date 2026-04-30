@@ -148,7 +148,7 @@ async def register_user(
     background_tasks.add_task(
         send_verification_email,
         user.email,
-        f"http://{settings.BACKEND_DOMAIN}/auth/verify/{token}",
+        f"{settings.BACKEND_DOMAIN}/auth/verify/{token}",
     )
 
     access_token, refresh_token = await issue_token_pair(db, user)
@@ -201,7 +201,7 @@ async def resend_verification_email(
         }
 
     token = create_url_safe_token({"email": normalized_email})
-    link = f"http://{settings.BACKEND_DOMAIN}/auth/verify/{token}"
+    link = f"{settings.BACKEND_DOMAIN}/auth/verify/{token}"
     background_tasks.add_task(send_verification_email, normalized_email, link)
 
     return {
