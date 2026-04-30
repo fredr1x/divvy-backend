@@ -145,4 +145,4 @@ async def _process_single(file: UploadFile, state: AppState) -> dict:
     img_bytes = await file.read()
     img_b64: str = await preprocess_receipt(state, img_bytes)  # ← await every async call
     response = await call_vlm(img_b64, state)  # ← await every async call
-    return json.loads(response)
+    return response
