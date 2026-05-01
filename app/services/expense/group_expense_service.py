@@ -1,4 +1,5 @@
 from app.models import GroupExpense, User, AuditLog
+from app.models.item import Item
 from app.models.enums import ActionType, ActionStatus
 from app.schemas.group_expense import (
     GroupExpenseCreate,
@@ -69,7 +70,10 @@ async def get_group_expense_by_group_id(
     stmt = (
         select(GroupExpense)
         .where(GroupExpense.group_id == group_id)
-        .options(selectinload(GroupExpense.splits))
+        .options(
+            selectinload(GroupExpense.splits),
+            selectinload(GroupExpense.items).selectinload(Item.item_splits),
+        )
         .order_by(GroupExpense.created_at.desc())
     )
     group_expenses = (await db.scalars(stmt)).all()
@@ -80,7 +84,7 @@ async def get_group_expense_by_group_id(
     db.add(audit_log)
     await db.commit()
 
-    return [GroupExpenseRead.model_validate(exp) for exp in group_expenses]
+    return [_to_group_expense_read(exp) for exp in group_expenses]
 
 
 async def create_group_expense(
@@ -143,11 +147,11 @@ async def create_group_expense(
     group_expense = await db.scalar(select(GroupExpense)
         .options(
             selectinload(GroupExpense.splits),
-            selectinload(GroupExpense.items),
+            selectinload(GroupExpense.items).selectinload(Item.item_splits),
         )
         .where(GroupExpense.id == group_expense.id))
 
-    return GroupExpenseRead.model_validate(group_expense)
+    return _to_group_expense_read(group_expense)
 
 
 async def update_group_expense(
@@ -194,8 +198,6 @@ async def update_group_expense(
     await update_expense_split(ip_address, db, group_expense, payload, current_user_id)
     await update_items_from_list(ip_address, db, group_expense.id, current_user_id, payload.expense_items)
 
-    await db.refresh(group_expense)
-
     audit_log.entity_id=group_expense.id
     audit_log.message="Successfully updated group expense"
     audit_log.action_status=ActionStatus.SUCCESS
@@ -203,4 +205,31 @@ async def update_group_expense(
     db.add(audit_log)
     await db.commit()
 
-    return GroupExpenseRead.model_validate(group_expense)
+    group_expense = await db.scalar(
+        select(GroupExpense)
+        .options(
+            selectinload(GroupExpense.splits),
+            selectinload(GroupExpense.items).selectinload(Item.item_splits),
+        )
+        .where(GroupExpense.id == group_expense.id)
+    )
+
+    return _to_group_expense_read(group_expense)
+
+
+def _to_group_expense_read(group_expense: GroupExpense) -> GroupExpenseRead:
+    return GroupExpenseRead(
+        id=group_expense.id,
+        payer_id=group_expense.payer_id,
+        group_id=group_expense.group_id,
+        name=group_expense.name,
+        total_amount=group_expense.total_amount,
+        created_by=group_expense.created_by,
+        created_at=group_expense.created_at,
+        splits=group_expense.splits,
+        items=group_expense.items,
+        item_splits={
+            item.id: [item_split.user_id for item_split in item.item_splits]
+            for item in group_expense.items
+        },
+    )

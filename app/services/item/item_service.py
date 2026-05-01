@@ -27,7 +27,7 @@ async def get_item_by_id(
     item = await db.scalar(select(Item).where(Item.id == id).options(selectinload(Item.item_splits)))
 
     if not item:
-        message="Item not found"
+        message=f"Item with id {id} not found"
         await create_failed_audit_log(db, audit_log, message)
         raise HTTPException(status_code=404, detail=message)
 

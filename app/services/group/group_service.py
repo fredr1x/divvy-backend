@@ -91,7 +91,7 @@ async def get_group_by_id(
         .where(UserGroup.user_id == current_user.id, UserGroup.group_id == id))
 
     if not group:
-        message="Group not found"
+        message=f"Group with id {id} not found"
         await create_failed_audit_log(db, audit_log, message)
         raise HTTPException(status_code=404, detail=message)
 

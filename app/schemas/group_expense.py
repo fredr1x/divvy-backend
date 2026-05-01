@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.enums import Currency, ShareType
 from app.schemas.expense_split import ExpenseSplitDetails
-from app.schemas.item import ItemCreate, ItemUpdate
+from app.schemas.item import ItemCreate, ItemUpdate, ItemRead
 
 
 class GroupExpenseCreate(BaseModel):
@@ -32,6 +32,8 @@ class GroupExpenseRead(BaseModel):
     created_at: datetime
 
     expenses_split: list[ExpenseSplitDetails] = Field(validation_alias="splits")
+    items: list[ItemRead]
+    item_splits: dict[int, list[int]]
 
     model_config = ConfigDict(from_attributes=True)
 

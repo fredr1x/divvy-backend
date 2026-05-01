@@ -8,15 +8,16 @@ from sqlalchemy.orm import selectinload
 
 from app.models import ExpenseSplit, GroupExpense, UserGroup, User, AuditLog
 from app.models.enums import ShareType, SplitStatus, SplitType, ActionType, ActionStatus
-from app.schemas import ItemCreate, ItemUpdate, UserRead
+from app.schemas import ItemCreate, ItemUpdate, UserRead, GroupRead
 from app.schemas.expense_split import (
     AllExpensesByGroupAndUser,
     OwedAmountDetail,
-    ReceivableAmountDetail, ExpenseSplitDetails,
+    ReceivableAmountDetail, ExpenseSplitDetails, ExpenseSplitBalances, UserSplitBalance,
 )
 from app.schemas.group_expense import GroupExpenseCreate, GroupExpenseUpdate
 from app.services.user.user_group_service import get_group_members
 from app.services.audit.audit_logs_service import create_failed_audit_log
+from app.services.group.group_service import get_group_by_id
 
 
 async def get_expense_split_by_id(
@@ -120,6 +121,32 @@ async def get_all_expenses_by_group_id_and_user_id(
         owed_amount_details=owed_amount_details,
         receivable_amount_details=receivable_amount_details,
     )
+
+
+async def get_balances(
+    ip_address: str,
+    group_id: int,
+    current_user: User,
+    db: AsyncSession
+) -> ExpenseSplitBalances:
+    group: GroupRead = await get_group_by_id(ip_address, db, group_id, current_user)
+
+    expense_splits: list[ExpenseSplit] = list(await db.scalars(select(ExpenseSplit)
+                          .join(GroupExpense, ExpenseSplit.group_expense_id == GroupExpense.id)
+                          .where(GroupExpense.group_id == group.id)))
+
+    result: dict[int, Decimal] = {}
+
+    for split in expense_splits:
+        result.setdefault(split.user_id, Decimal("0.00"))
+        result[split.user_id] += split.owed_amount
+
+    balances: list[UserSplitBalance] = [
+        UserSplitBalance(user_id=user_id, balance=balance)
+        for user_id, balance in result.items()
+    ]
+
+    return ExpenseSplitBalances(group_id=group_id, balances=balances)
 
 
 async def create_expense_split(

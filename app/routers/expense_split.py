@@ -4,9 +4,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_db
 from app.dependencies import get_current_verified_user
 from app.models.user import User
-from app.schemas import AllExpensesByGroupAndUser
+from app.schemas import AllExpensesByGroupAndUser, ExpenseSplitBalances
 from app.services.expense.expense_split_service import (
     get_all_expenses_by_group_id_and_user_id,
+    get_balances as get_balances_service
 )
 from app.dependencies import get_ip_address
 
@@ -39,3 +40,13 @@ async def get_all_by_group_id(
         HTTPException 404: If group not found
     """
     return await get_all_expenses_by_group_id_and_user_id(get_ip_address(request), db, group_id, current_user.id)
+
+
+@router.get("/{group_id}/balances")
+async def get_balances(
+    request: Request,
+    group_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_verified_user),
+)-> ExpenseSplitBalances:
+    return await get_balances_service(get_ip_address(request), group_id, current_user, db)

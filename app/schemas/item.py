@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field, ConfigDict
 
 
 class ItemRead(BaseModel):
+    id: int
     name: str
     group_expense_id: int
     price: Decimal
