@@ -18,7 +18,7 @@ async def update_user(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_verified_user),
 ):
-    return update_user_service(get_ip_address(request), payload, current_user, db)
+    return await update_user_service(get_ip_address(request), payload, current_user, db)
 
 
 @router.delete("/", status_code=status.HTTP_204_NO_CONTENT)

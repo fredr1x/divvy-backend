@@ -391,7 +391,7 @@ async def persist_snapshot_splits(
     await db.commit()
 
 
-async def build_expense(
+def build_expense(
     member_id: int,
     group_expense_id: int,
     amount_for_each_member: Decimal,
