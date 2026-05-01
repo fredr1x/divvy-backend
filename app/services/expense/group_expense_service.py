@@ -118,7 +118,7 @@ async def create_group_expense(
     group_expense = GroupExpense(
         payer_id=payer.id,
         group_id=group.id,
-        created_by=payload.created_by,
+        created_by=current_user.id,
         name=payload.name,
         currency=payload.currency or group.currency,
         total_amount=payload.total_amount,

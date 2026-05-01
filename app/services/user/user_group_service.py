@@ -11,7 +11,7 @@ from app.models.enums import GroupRole
 from app.schemas import UserGroupAddMemberByEmail
 from app.schemas.user import UserRead
 from app.schemas.user_group import UserGroupRead
-from starlette.responses import HTMLResponse
+from starlette.responses import HTMLResponse, RedirectResponse
 
 
 async def get_group_by_id(
@@ -101,7 +101,7 @@ async def invite_to_group_by_email(
 async def join_by_invitation_link(
     db: AsyncSession,
     link: str,
-) -> HTMLResponse:
+) -> RedirectResponse | HTMLResponse:
 
     try:
         token = extract_link(link)
@@ -114,12 +114,12 @@ async def join_by_invitation_link(
             raise HTTPException(status_code=404, detail="Invitation not found")
 
         if existing_member.is_active:
-            return return_success_html_response(UserGroupRead.model_validate(existing_member))
+            return RedirectResponse(url=f"{settings.FRONTEND_DOMAIN}/groups/{existing_member.group_id}")
 
         existing_member.is_active = True
         await db.flush()
         await db.refresh(existing_member)
-        return return_success_html_response(UserGroupRead.model_validate(existing_member))
+        return RedirectResponse(url=f"{settings.FRONTEND_DOMAIN}/groups/{existing_member.group_id}")
 
     except HTTPException as e:
         return return_failed_html_response(e)
