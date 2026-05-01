@@ -7,21 +7,21 @@ from app.db.session import get_db
 from app.schemas.group import GroupCreate, GroupRead, GroupUpdate
 from app.services.group.group_service import (
     create_group as create_group_service,
-)
-from app.services.group.group_service import (
     get_group_by_id as get_group_by_id_service,
-)
-from app.services.group.group_service import (
     delete_group as delete_group_service,
-)
-from app.services.group.group_service import (
     get_invitation_link_by_group_id,
-)
-from app.services.group.group_service import (
     update_group as update_group_service,
+    get_groups_by_user as get_groups_by_user_service
 )
 
 router = APIRouter(prefix="/groups", tags=["groups"])
+
+@router.get("/user-groups")
+async def get_all_by_user_id(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_verified_user),
+)-> list[GroupRead]:
+    return await get_groups_by_user_service(db, current_user)
 
 
 @router.get("/{id}", response_model=GroupRead)

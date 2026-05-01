@@ -11,6 +11,7 @@ from app.schemas import (
     UserCreate,
 )
 from app.services.auth.auth_service import (
+    get_google_frontend_callback_redirect,
     get_google_login_redirect,
     handle_google_callback,
     login_user,
@@ -166,11 +167,10 @@ async def google_login() -> RedirectResponse:
     return get_google_login_redirect()
 
 
-@router.get("/google/callback", response_model=TokenPair)
+@router.get("/google/callback")
 async def google_callback(
     code: str = Query(...),
-    db: AsyncSession = Depends(get_db),
-) -> TokenPair:
+):
     """
     Handle the Google OAuth2 callback and authenticate the user.
 
@@ -190,4 +190,12 @@ async def google_callback(
         HTTPException 400: If the token exchange fails, the ID token is missing or invalid,
                            the Google audience does not match, or the profile is incomplete
     """
+    return get_google_frontend_callback_redirect(code)
+
+
+@router.get("/google/complete", response_model=TokenPair)
+async def google_complete(
+    code: str = Query(...),
+    db: AsyncSession = Depends(get_db),
+) -> TokenPair:
     return await handle_google_callback(code, db)

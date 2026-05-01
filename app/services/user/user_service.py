@@ -57,6 +57,7 @@ async def create_google_user(
         password=None,
         auth_provider="google",
         google_sub=google_sub,
+        is_verified=True,
     )
     db.add(user)
     await db.flush()
