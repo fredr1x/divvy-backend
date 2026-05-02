@@ -21,12 +21,13 @@ class ExpenseSplitDetails(BaseModel):
 class OwedAmountDetail(BaseModel):
     amount: Decimal
     to_user_id: int
+    status: SplitStatus
 
 
 class ReceivableAmountDetail(BaseModel):
     amount: Decimal
     from_user_id: int
-
+    status: SplitStatus
 
 class AllExpensesByGroupAndUser(BaseModel):
     group_id: int
