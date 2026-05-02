@@ -2,6 +2,12 @@
 
 AI-powered finance tracker for managing personal and group expenses with automated receipt OCR.
 
+## Team members
+ID: 230103074 Yerdaulet Amanbay \
+ID: 230103277 Dias Izdibayev \
+ID: 230103107 Alikhan Bissenov \
+ID: 230103059 Nursanat Mussa
+
 ## Problem Statement
 Tracking shared expenses is often slow and error-prone, especially for couples, roommates, trips, and group activities. Manual receipt entry creates ambiguity about who paid, who owes, and how to split costs fairly.
 
