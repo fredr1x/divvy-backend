@@ -12,7 +12,7 @@ from starlette.responses import Response
 
 router = APIRouter(prefix="/users", tags=["users"])
 
-@router.patch("/")
+@router.patch("")
 async def update_user(
     request: Request,
     payload: UserUpdate,
@@ -53,7 +53,7 @@ async def change_password(
     )
 
 
-@router.delete("/", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_user(
     request: Request,
     db: AsyncSession = Depends(get_db),

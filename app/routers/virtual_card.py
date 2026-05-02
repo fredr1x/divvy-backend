@@ -31,7 +31,7 @@ from app.services.card.virtual_card_service import (
 router = APIRouter(prefix="/virtual-card", tags=["virtual-card"])
 
 
-@router.get("/")
+@router.get("")
 async def get_virtual_card_by_user(
     request: Request,
     current_user: User = Depends(get_current_verified_user),
@@ -56,7 +56,7 @@ async def get_virtual_card_by_user(
     )
 
 
-@router.post("/")
+@router.post("")
 async def create_virtual_card(
     request: Request,
     current_user: User = Depends(get_current_verified_user),
