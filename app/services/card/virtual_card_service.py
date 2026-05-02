@@ -125,12 +125,14 @@ async def create_virtual_card(
             currency=Currency.USD,
         )
 
+        balances: list[CardBalanceRead] = await get_all_balances_by_card_id(db, new_card.id)
+
         return VirtualCardRead(
             id=new_card.id,
             stripe_customer_id=new_card.stripe_customer_id,
             card_number=new_card.card_number,
             card_last4=new_card.card_last4,
-            balance=Decimal("0.0"),
+            balances=balances,
         )
 
     except StripeError as e:
@@ -210,12 +212,14 @@ async def deposit_virtual_card(
             metadata=payment_intent.metadata,
         )
 
+        balances: list[CardBalanceRead] = await get_all_balances_by_card_id(db, virtual_card.id)
+
         return VirtualCardRead(
             id=virtual_card.id,
             stripe_customer_id=virtual_card.stripe_customer_id,
             card_number=virtual_card.card_number,
             card_last4=virtual_card.card_last4,
-            balance=card_balance.balance,
+            balances=balances,
         )
 
     except StripeError as e:
@@ -305,10 +309,12 @@ async def pay_debt(
         db.add(audit_log)
         await db.commit()
 
+        balances: list[CardBalanceRead] = await get_all_balances_by_card_id(db, virtual_card.id)
+
         return PayDebtResponse(
             expense_split_id=expense_split.id,
             expense_split_status=expense_split.status,
-            card_balance=card_balance.balance,
+            balances=balances,
         )
 
     except StripeError as e:

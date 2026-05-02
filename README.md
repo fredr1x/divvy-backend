@@ -1,4 +1,9 @@
 # Divvy Backend
+## Team members
+ID: 230103074 Yerdaulet Amanbay \
+ID: 230103277 Dias Izdibayev \
+ID: 230103107 Alikhan Bissenov \
+ID: 230103059 Nursanat Mussa
 
 REST API for Divvy: an AI-assisted finance tracker for personal and group expenses, with receipt upload and structured extraction.
 
@@ -107,8 +112,3 @@ You still need PostgreSQL (and optionally MinIO) reachable per your `.env`.
 3. `**http://localhost:8001/docs**` — Swagger UI; `**/redoc**` — ReDoc.
 
 Notable route prefixes include `/auth`, `/users`, `/groups`, `/user-groups`, `/group-expenses`, `/expense-split`, `/group-media`, `/minio`, `/virtual-card`, and `**POST /scan-receipt**` (OCR; requires an authenticated, verified user).
-
-## Further reading
-
-- `AUDIT.md` — internal audit notes on structure and git history.
-

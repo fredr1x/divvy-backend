@@ -28,4 +28,4 @@ class PayDebtRequest(BaseModel):
 class PayDebtResponse(BaseModel):
     expense_split_id: int
     expense_split_status: SplitStatus
-    card_balance: Decimal
+    balances: list[CardBalanceRead]
