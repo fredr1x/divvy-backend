@@ -1,4 +1,3 @@
-from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,18 +9,16 @@ async def get_next_card(db: AsyncSession):
         select(StripeNextCard).where(StripeNextCard.id == 1)
     )
     if not next_card:
-        raise HTTPException(status_code=400, detail="Failed to get next card number")
+        next_card = StripeNextCard(id=1, number=0)
+        db.add(next_card)
+        await db.flush()
+        await db.refresh(next_card)
 
     return next_card
 
 
 async def get_next_card_number(db: AsyncSession):
-    next_card: StripeNextCard = await db.scalar(
-        select(StripeNextCard).where(StripeNextCard.id == 1)
-    )
-    if not next_card:
-        raise HTTPException(status_code=400, detail="Failed to get next card number")
-
+    next_card: StripeNextCard = await get_next_card(db)
     return next_card.number
 
 
