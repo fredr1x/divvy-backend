@@ -49,4 +49,23 @@ async def get_balances(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_verified_user),
 )-> ExpenseSplitBalances:
+    """
+    Retrieve settlement balances for all members in a group.
+
+    Computes who owes whom in the specified group and returns
+    aggregated balances from the perspective of the current user.
+
+    Args:
+        request: The incoming HTTP request (used for IP address logging)
+        group_id: The ID of the group to calculate balances for
+        db: Database session
+        current_user: The authenticated and verified user
+
+    Returns:
+        ExpenseSplitBalances: Calculated debtor/creditor balances for the group
+
+    Raises:
+        HTTPException 403: If the current user has no access to the group
+        HTTPException 404: If the group is not found
+    """
     return await get_balances_service(get_ip_address(request), group_id, current_user, db)

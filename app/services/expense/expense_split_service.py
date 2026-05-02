@@ -94,7 +94,7 @@ async def get_all_expenses_by_group_id_and_user_id(
             if split.user_id == user_id and expense.payer_id != user_id:
                 owed_amount_details.append(
                     OwedAmountDetail(
-                        to_user_id=expense.payer_id, amount=split.owed_amount
+                        to_user_id=expense.payer_id, amount=split.owed_amount, status=split.status
                     )
                 )
                 total_owed += split.owed_amount
@@ -102,7 +102,7 @@ async def get_all_expenses_by_group_id_and_user_id(
             elif expense.payer_id == user_id and split.user_id != user_id:
                 receivable_amount_details.append(
                     ReceivableAmountDetail(
-                        from_user_id=split.user_id, amount=abs(split.owed_amount)
+                        from_user_id=split.user_id, amount=abs(split.owed_amount), status=split.status
                     )
                 )
                 total_receivable += abs(split.owed_amount)
