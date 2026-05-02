@@ -270,12 +270,19 @@ async def pay_debt(
         await create_failed_audit_log(db, audit_log, message)
         raise HTTPException(status_code=400, detail=message)
 
+    owed_amount_usd = await CurrencyService.convert_amount(current_user.id,
+                                                           ip_address,
+                                                           db,
+                                                           expense_split.owed_amount,
+                                                           group_expense.currency,
+                                                           Currency.USD)
+
     try:
         payment_intent = StripeService.pay_debt(
             customer_id=virtual_card.stripe_customer_id,
             payment_method_id=virtual_card.stripe_payment_method_id,
-            amount=abs(expense_split.owed_amount),
-            currency=group_expense.currency,
+            amount=expense_split.owed_amount if owed_amount_usd > 0.50 else 1,
+            currency=group_expense.currency if owed_amount_usd > 0.50 else Currency.USD,
             debt_id=expense_split.id,
             description=f"Paying debt {expense_split.id}",
         )

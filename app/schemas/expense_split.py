@@ -7,6 +7,7 @@ from app.models.enums import SplitStatus, SplitType
 
 
 class ExpenseSplitDetails(BaseModel):
+    id: int
     user_id: int
     owed_amount: Decimal
     split_type: SplitType
