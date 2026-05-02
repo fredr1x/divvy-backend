@@ -11,7 +11,8 @@ from app.schemas.test_table import (
 from app.schemas.user import (
     UserCreate,
     UserRead,
-    UserUpdate
+    UserUpdate,
+    ChangePasswordRequest
 )
 from app.schemas.group import (
     GroupCreate,

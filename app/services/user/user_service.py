@@ -7,8 +7,9 @@ from app.services.audit.audit_logs_service import create_log
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.security import hash_password
+from app.core.security import hash_password, verify_password
 from app.models.user import User
+from fastapi import HTTPException
 
 
 async def get_user_by_id(db: AsyncSession, user_id: int) -> User | None:
@@ -102,6 +103,59 @@ async def update_user(
             action_status=ActionStatus.SUCCESS,
         ),
         message="User account has been updated successfully"
+    )
+
+    db.add(current_user)
+    await db.commit()
+    await db.refresh(current_user)
+
+    return UserRead.model_validate(current_user)
+
+
+async def change_password(
+    ip_address: str,
+    current_user: User,
+    current_password: str,
+    new_password: str,
+    db: AsyncSession,
+) -> UserRead:
+    if not current_user.password:
+        raise HTTPException(
+            status_code=400,
+            detail="Password change is not allowed for OAuth users"
+        )
+
+    if not verify_password(current_password, current_user.password):
+        raise HTTPException(
+            status_code=400,
+            detail="Current password is incorrect"
+        )
+
+    if current_password == new_password:
+        raise HTTPException(
+            status_code=400,
+            detail="New password must be different from current password"
+        )
+
+    old_values = [UserRead.model_validate(current_user).model_dump(mode="json")]
+
+    current_user.password = hash_password(new_password)
+
+    new_values = [UserRead.model_validate(current_user).model_dump(mode="json")]
+
+    await create_log(
+        db,
+        AuditLog(
+            user_id=current_user.id,
+            ip_address=ip_address,
+            action_type=ActionType.UPDATE,
+            entity_id=current_user.id,
+            entity_name="USER",
+            old_values=old_values,
+            new_values=new_values,
+            action_status=ActionStatus.SUCCESS,
+        ),
+        message="User password has been changed successfully"
     )
 
     db.add(current_user)
