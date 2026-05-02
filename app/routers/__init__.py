@@ -1,3 +1,4 @@
+from app.routers.audit_logs import router as audit_logs_router
 from app.routers.auth import router as auth_router
 from app.routers.test_table import router as test_table_router
 from app.routers.group import router as group_router

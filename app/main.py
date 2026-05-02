@@ -10,6 +10,7 @@ from app.exceptions.exceptions import register_all_errors
 from app.jobs.currency_rates_job import update_currency_rates
 
 from app.routers import (
+    audit_logs_router,
     auth_router,
     user_router,
     expense_split_router,
@@ -70,6 +71,8 @@ app.add_middleware(
 register_all_errors(app)
 
 app.include_router(auth_router)
+
+app.include_router(audit_logs_router)
 
 app.include_router(user_router)
 
