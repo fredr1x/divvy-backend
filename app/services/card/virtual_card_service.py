@@ -116,6 +116,7 @@ async def create_virtual_card(
         audit_log.message = f"Virtual card created successfully for user {current_user.id}"
         db.add(audit_log)
         await db.commit()
+        await db.refresh(new_card)
 
         await deposit_balance(
             ip_address=ip_address,

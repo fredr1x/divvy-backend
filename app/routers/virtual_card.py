@@ -120,6 +120,7 @@ async def deposit_virtual_card(
 @router.post("/{card_id}/pay-debt")
 async def pay_debt(
     request: Request,
+    card_id: int,
     payload: PayDebtRequest,
     current_user: User = Depends(get_current_verified_user),
     db: AsyncSession = Depends(get_db),
