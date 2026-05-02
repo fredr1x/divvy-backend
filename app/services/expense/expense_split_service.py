@@ -528,9 +528,5 @@ def validate_expense_items(
             detail=f"Users {invalid_users} are assigned to items but not in expense members",
         )
 
-    unassigned_users = set(expense_members) - all_assigned_user_ids
-    if unassigned_users:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Users {unassigned_users} are expense members but not assigned to any item",
-        )
+    # For itemized expenses, it is valid that some expense members are not assigned
+    # to any individual item; those members simply keep a zero share.
