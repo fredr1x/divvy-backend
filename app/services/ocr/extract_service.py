@@ -10,7 +10,6 @@ from app.models import AuditLog, User
 from app.models.enums import ActionStatus, ActionType
 from app.schemas.item import ReceiptItems, OutputSchema
 from app.services.audit.audit_logs_service import create_failed_audit_log, create_log
-from app.services.group.group_media_service import upload_receipt
 from app.services.ocr.const import AppState
 from app.services.ocr.preprocess import clean_and_merge, preprocess_receipt
 from app.services.ocr.prompt import SYSTEM_PROMPT
@@ -93,15 +92,6 @@ async def extract_items(
     audit_log.action_status=ActionStatus.SUCCESS
     await create_log(
         db=db, audit_log=audit_log, message="Successfully Extracted Receipt items!"
-    )
-
-    _ = await upload_receipt(
-        ip_address=ip_address,
-        group_id=group_id,
-        expense_id=expense_id,
-        db=db,
-        current_user=current_user,
-        files=files,
     )
 
     return merged_receipts
