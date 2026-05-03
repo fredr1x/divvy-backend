@@ -71,6 +71,7 @@ async def issue_token_pair(db: AsyncSession, user: User) -> tuple[str, str]:
         user.email,
         user.is_verified,
         user.is_active,
+        user.auth_provider,
     )
 
     refresh_plain = new_refresh_token_plain()

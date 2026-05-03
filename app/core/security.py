@@ -24,6 +24,7 @@ def create_access_token(
     email: str,
     is_verified: bool,
     is_active: bool,
+    auth_provider: str,
 ) -> str:
     expire = datetime.now() + timedelta(
         minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES
@@ -38,6 +39,7 @@ def create_access_token(
         "last_name": last_name,
         "is_verified": is_verified,
         "is_active": is_active,
+        "auth_provider": auth_provider,
     }
     return jwt.encode(payload, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
