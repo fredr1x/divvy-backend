@@ -223,6 +223,7 @@ def _to_group_expense_read(group_expense: GroupExpense) -> GroupExpenseRead:
         payer_id=group_expense.payer_id,
         group_id=group_expense.group_id,
         name=group_expense.name,
+        currency=group_expense.currency,
         total_amount=group_expense.total_amount,
         created_by=group_expense.created_by,
         created_at=group_expense.created_at,

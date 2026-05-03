@@ -27,6 +27,7 @@ class GroupExpenseRead(BaseModel):
     payer_id: int
     group_id: int
     name: str
+    currency: Currency
     total_amount: Decimal
     created_by: int
     created_at: datetime
